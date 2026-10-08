@@ -46,6 +46,7 @@ function settings_schema(): array
 
         'tg_token'         => ['Уведомления', 'Токен Telegram-бота', 'secret', '', 'Выдаёт @BotFather при создании бота. Хранится скрыто'],
         'tg_chats'         => ['Уведомления', 'ID чатов Telegram для заявок', 'text', '', 'Через запятую. Нажмите «Найти ID чата» ниже'],
+        'tg_api_url'       => ['Уведомления', 'Адрес-посредник для Telegram', 'text', '', 'Только если хостинг не видит Telegram (заявки не доходят). Например, https://leonpro-tg.имя.workers.dev. Пусто — напрямую'],
         'manager_email'    => ['Уведомления', 'Email менеджера для новых заказов', 'text', '', 'Необязательно, дублирует заявки на почту. Можно несколько через запятую'],
         'mail_from'        => ['Уведомления', 'Адрес отправителя писем', 'text', '', 'Например, noreply@ваш-домен.ru (ящик на вашем домене)'],
 
@@ -396,7 +397,8 @@ function tg_api(string $method, array $params = []): array
     if ($token === '') {
         return ['ok' => false, 'description' => 'Не указан токен бота'];
     }
-    $url = (getenv('LEONPRO_TG_API') ?: 'https://api.telegram.org') . '/bot' . $token . '/' . $method;
+    $base = rtrim(trim(setting('tg_api_url')) ?: (getenv('LEONPRO_TG_API') ?: 'https://api.telegram.org'), '/');
+    $url = $base . '/bot' . $token . '/' . $method;
     $body = http_build_query($params);
     if (function_exists('curl_init')) {
         $ch = curl_init($url);
