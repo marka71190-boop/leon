@@ -1,0 +1,13 @@
+.git
+.github
+data/*
+!data/.htaccess
+uploads/*
+!uploads/.htaccess
+api
+vercel.json
+docker-compose.yml
+.env
+.env.example
+README.md
+*.zip

@@ -1,0 +1,9 @@
+# База данных и загруженные файлы живут только на сервере
+data/*
+!data/.htaccess
+uploads/*
+!uploads/.htaccess
+.DS_Store
+
+# Настройки сервера
+.env

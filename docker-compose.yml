@@ -1,0 +1,34 @@
+name: leonpro
+# Запуск: docker compose up -d --build
+# SITE_ADDRESS в файле .env: домен (leonpro.ru) — HTTPS-сертификат выпустится сам;
+# пока домена нет — оставьте ":80", сайт откроется по IP сервера.
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    volumes:
+      - leonpro_data:/var/www/html/data
+      - leonpro_uploads:/var/www/html/uploads
+    expose:
+      - "80"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - web
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  leonpro_data:
+  leonpro_uploads:
+  caddy_data:
+  caddy_config:

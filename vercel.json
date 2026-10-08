@@ -1,0 +1,18 @@
+{
+  "functions": {
+    "api/index.php": {
+      "runtime": "vercel-php@0.7.3",
+      "includeFiles": "**/*.php"
+    }
+  },
+  "routes": [
+    { "src": "/(inc|data|api)(/.*)?", "status": 404, "dest": "/api/index.php" },
+    { "src": "/(.*\\.php)", "dest": "/api/index.php" },
+    { "src": "/", "dest": "/api/index.php" },
+    { "src": "/admin/?", "dest": "/api/index.php" },
+    { "src": "/uploads/(.*)", "dest": "/api/index.php" },
+    { "src": "/(README\\.md|\\.htaccess|\\.gitignore)", "status": 404, "dest": "/api/index.php" },
+    { "handle": "filesystem" },
+    { "src": "/(.*)", "dest": "/api/index.php" }
+  ]
+}
