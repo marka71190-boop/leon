@@ -51,10 +51,12 @@ if ($id) {
     $o = q('SELECT o.*, u.email AS u_email, u.phone AS u_phone FROM orders o LEFT JOIN users u ON u.id = o.user_id WHERE o.id = ?', [$id])->fetch();
     if (!$o) redirect('admin/orders.php');
     $items = q('SELECT * FROM order_items WHERE order_id = ?', [$id])->fetchAll();
+    $consents = q('SELECT * FROM consents WHERE order_id = ? ORDER BY id', [$id])->fetchAll();
     admin_header('Заказ № ' . $id, 'orders');
     ?>
     <div class="a-head"><h1>Заказ № <?= $id ?> <span class="pill pill-<?= e($o['status']) ?>" style="vertical-align:middle"><?= e(status_label($o['status'])) ?></span></h1><a href="<?= url('admin/orders.php') ?>">← Все заказы</a></div>
     <p class="a-muted">Создан <?= date('d.m.Y H:i', strtotime($o['created_at'])) ?><?= $o['user_id'] ? ' · клиент зарегистрирован (' . e($o['u_email'] ?: $o['u_phone']) . ')' : ' · без регистрации' ?></p>
+    <p class="a-muted" style="margin-top:-6px">Согласия: <?php if ($consents): ?><?= e(implode(', ', array_map(fn($c) => (consent_kinds()[$c['kind']][0] ?? $c['kind']) . ' ✓' . ($c['revoked_at'] ? ' (отозвано)' : ''), $consents))) ?> · <?= date('d.m.Y H:i:s', strtotime($consents[0]['created_at'])) ?> · IP <?= e($consents[0]['ip'] ?: '—') ?> · <a href="<?= url('admin/consents.php?q=' . $id) ?>">в журнале</a><?php else: ?>не записаны (заявка оформлена до появления журнала)<?php endif; ?></p>
     <form method="post" class="a-form">
       <?= csrf_field() ?><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="action" value="save">
       <div class="a-card">

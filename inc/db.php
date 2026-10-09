@@ -69,6 +69,23 @@ function db_migrate(PDO $pdo): void
         $pdo->exec("DELETE FROM settings WHERE key IN ('phone','email','address','work_hours') AND value LIKE '%[%'");
         $pdo->exec("INSERT INTO settings (key, value) VALUES ('db_version', '2') ON CONFLICT(key) DO UPDATE SET value = '2'");
     }
+    if ($v < 3) {
+        // Журнал согласий: кто, когда, с какого IP и на какой текст документа поставил галочку.
+        // Без внешних ключей: запись должна остаться, даже если клиента или заказ удалят.
+        $pdo->exec(<<<SQL
+CREATE TABLE IF NOT EXISTS consents (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL,
+  source TEXT NOT NULL, kind TEXT NOT NULL, user_id INTEGER, order_id INTEGER,
+  company TEXT DEFAULT '', contact TEXT DEFAULT '', email TEXT DEFAULT '', phone TEXT DEFAULT '',
+  ip TEXT DEFAULT '', user_agent TEXT DEFAULT '', checkbox_text TEXT DEFAULT '', doc_hash TEXT DEFAULT '',
+  revoked_at TEXT, revoked_note TEXT DEFAULT '');
+CREATE INDEX IF NOT EXISTS consents_user ON consents(user_id);
+CREATE INDEX IF NOT EXISTS consents_order ON consents(order_id);
+CREATE TABLE IF NOT EXISTS consent_docs (
+  hash TEXT PRIMARY KEY, slug TEXT, title TEXT, content TEXT, created_at TEXT NOT NULL);
+SQL);
+        $pdo->exec("INSERT INTO settings (key, value) VALUES ('db_version', '3') ON CONFLICT(key) DO UPDATE SET value = '3'");
+    }
 }
 
 function table_exists(PDO $pdo, string $name): bool

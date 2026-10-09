@@ -471,3 +471,62 @@ function send_mail(string $to, string $subject, string $body): bool
     @file_put_contents(preg_replace('~\.sqlite$~', '-mail.log', db_file()),date('c') . ' | ' . ($ok ? 'OK ' : 'FAIL') . " | $to | $subject\n", FILE_APPEND);
     return $ok;
 }
+
+/* ---------- Согласия (152-ФЗ) ---------- */
+
+/** Виды согласий: название, страница с текстом документа, текст галочки */
+function consent_kinds(): array
+{
+    return [
+        'pd'     => ['Обработка персональных данных', 'privacy', 'Даю согласие на обработку персональных данных'],
+        'oferta' => ['Публичная оферта', 'oferta', 'Принимаю условия публичной оферты'],
+    ];
+}
+
+function consent_sources(): array
+{
+    return ['register' => 'Регистрация', 'order' => 'Заявка'];
+}
+
+/** IP посетителя. За прокси (Caddy в Docker) настоящий адрес приходит в X-Forwarded-For */
+function client_ip(): string
+{
+    $ip = (string)($_SERVER['REMOTE_ADDR'] ?? '');
+    $fwd = (string)($_SERVER['HTTP_X_FORWARDED_FOR'] ?? '');
+    $isPublic = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE);
+    if ($fwd !== '' && !$isPublic) {
+        $first = trim(explode(',', $fwd)[0]);
+        if (filter_var($first, FILTER_VALIDATE_IP)) {
+            $ip = $first;
+        }
+    }
+    return $ip;
+}
+
+/**
+ * Записать согласия в журнал. Текст документа (политики, оферты) сохраняется отдельной версией —
+ * в админке видно, какую именно редакцию принял человек, даже если текст потом поменяли.
+ */
+function consent_log(string $source, array $kinds, array $who, ?int $userId = null, ?int $orderId = null): void
+{
+    $all = consent_kinds();
+    $now = date('Y-m-d H:i:s');
+    foreach ($kinds as $kind) {
+        if (!isset($all[$kind])) {
+            continue;
+        }
+        [$label, $slug, $text] = $all[$kind];
+        $page = q('SELECT title, content FROM pages WHERE slug = ?', [$slug])->fetch();
+        $title = $page['title'] ?? $label;
+        $content = $page ? render_content((string)$page['content']) : '';
+        $hash = substr(hash('sha256', $title . "\n" . $content), 0, 16);
+        q('INSERT OR IGNORE INTO consent_docs (hash, slug, title, content, created_at) VALUES (?,?,?,?,?)', [$hash, $slug, $title, $content, $now]);
+        q('INSERT INTO consents (created_at, source, kind, user_id, order_id, company, contact, email, phone, ip, user_agent, checkbox_text, doc_hash)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+            $now, $source, $kind, $userId, $orderId,
+            (string)($who['company'] ?? ''), (string)($who['contact'] ?? ''), (string)($who['email'] ?? ''), (string)($who['phone'] ?? ''),
+            client_ip(), mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 300), $text, $hash,
+        ]);
+    }
+}
+

@@ -34,6 +34,7 @@ if ($id) {
     $u = q('SELECT * FROM users WHERE id = ?', [$id])->fetch();
     if (!$u) redirect('admin/clients.php');
     $orders = q('SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC', [$id])->fetchAll();
+    $consents = q('SELECT * FROM consents WHERE user_id = ? ORDER BY id DESC LIMIT 10', [$id])->fetchAll();
     admin_header('Клиент', 'clients');
     ?>
     <div class="a-head"><h1><?= e($u['company'] ?: ($u['email'] ?: '+' . $u['phone'])) ?></h1><a href="<?= url('admin/clients.php') ?>">← Все клиенты</a></div>
@@ -63,7 +64,16 @@ if ($id) {
       </tbody></table></div>
       <?php endif; ?>
     </div>
-    <form method="post" data-confirm="Удалить аккаунт клиента? Заказы останутся."><?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= $id ?>"><button class="a-btn a-btn-danger a-btn-sm" type="submit">Удалить клиента</button></form>
+    <div class="a-card">
+      <h2>Согласия</h2>
+      <?php if (!$consents): ?><p class="a-muted">Согласий не записано: клиент зарегистрировался до появления журнала согласий.</p><?php else: ?>
+      <div class="a-table-wrap"><table class="a-table"><tbody>
+        <?php foreach ($consents as $c): ?><tr><td style="white-space:nowrap"><?= date('d.m.Y H:i', strtotime($c['created_at'])) ?></td><td><?= e(consent_kinds()[$c['kind']][0] ?? $c['kind']) ?><?= $c['revoked_at'] ? ' <span style="color:#B42318">(отозвано)</span>' : '' ?></td><td><?= e(consent_sources()[$c['source']] ?? $c['source']) ?><?= $c['order_id'] ? ', заявка № ' . (int)$c['order_id'] : '' ?></td><td class="a-muted">IP <?= e($c['ip'] ?: '—') ?></td></tr><?php endforeach; ?>
+      </tbody></table></div>
+      <p style="margin:10px 0 0"><a href="<?= url('admin/consents.php?user=' . $id) ?>">Все согласия клиента →</a></p>
+      <?php endif; ?>
+    </div>
+    <form method="post" data-confirm="Удалить аккаунт клиента? Заказы и журнал согласий останутся."><?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= $id ?>"><button class="a-btn a-btn-danger a-btn-sm" type="submit">Удалить клиента</button></form>
     <?php
     admin_footer();
     exit;

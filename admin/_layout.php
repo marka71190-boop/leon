@@ -13,6 +13,7 @@ function admin_header(string $title, string $active = '', bool $editor = false):
         'documents'  => ['Документы', 'admin/documents.php'],
         'pages'      => ['Страницы', 'admin/pages.php'],
         'clients'    => ['Клиенты', 'admin/clients.php'],
+        'consents'   => ['Согласия', 'admin/consents.php'],
         'settings'   => ['Настройки сайта', 'admin/settings.php'],
         'admins'     => ['Администраторы', 'admin/admins.php'],
     ];

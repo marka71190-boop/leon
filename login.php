@@ -21,16 +21,19 @@ if (is_post()) {
         if ($old['email'] !== '' && !filter_var($old['email'], FILTER_VALIDATE_EMAIL)) $errors[] = 'Проверьте email.';
         if ($phone !== '' && strlen($phone) !== 11) $errors[] = 'Проверьте номер телефона.';
         if (mb_strlen($pass) < 6) $errors[] = 'Пароль — не короче 6 символов.';
+        if (empty($_POST['agree_pd'])) $errors[] = 'Нужно согласие на обработку персональных данных.';
         if (!$errors) {
             if ($old['email'] !== '' && q('SELECT 1 FROM users WHERE email = ?', [$old['email']])->fetchColumn()) $errors[] = 'Этот email уже зарегистрирован — войдите.';
             if ($phone !== '' && q('SELECT 1 FROM users WHERE phone = ?', [$phone])->fetchColumn()) $errors[] = 'Этот телефон уже зарегистрирован — войдите.';
         }
         if (!$errors) {
-            q('INSERT INTO users (email, phone, password_hash, company) VALUES (?,?,?,?)', [
-                $old['email'] ?: null, $phone ?: null, password_hash($pass, PASSWORD_DEFAULT), $old['company'],
+            q('INSERT INTO users (email, phone, password_hash, company, created_at) VALUES (?,?,?,?,?)', [
+                $old['email'] ?: null, $phone ?: null, password_hash($pass, PASSWORD_DEFAULT), $old['company'], date('Y-m-d H:i:s'),
             ]);
+            $newId = (int)db()->lastInsertId();
+            consent_log('register', ['pd'], ['company' => $old['company'], 'email' => $old['email'], 'phone' => $phone ? '+' . $phone : ''], $newId);
             session_regen();
-            $_SESSION['user_id'] = (int)db()->lastInsertId();
+            $_SESSION['user_id'] = $newId;
             flash('Вы зарегистрированы. Заполните реквизиты компании — они будут подставляться в заявки.');
             redirect($backTo === 'cart.php' ? 'cart.php' : 'account.php?tab=profile');
         }
@@ -80,6 +83,7 @@ $qs = $backTo === 'cart.php' ? '&back=cart' : '';
         <label class="field">Телефон<input name="phone" type="tel" autocomplete="tel" placeholder="+7" value="<?= e($old['phone'] ?? '') ?>"><span class="hint">Укажите email, телефон или оба — входить можно по любому из них.</span></label>
         <label class="field">Название компании<input name="company" value="<?= e($old['company'] ?? '') ?>"></label>
         <label class="field">Пароль<input name="password" type="password" required minlength="6" autocomplete="new-password"><span class="hint">Не короче 6 символов</span></label>
+        <label class="check"><input type="checkbox" name="agree_pd" value="1" required> <span>Даю согласие на <a href="<?= url('page.php?p=privacy') ?>" target="_blank">обработку персональных данных</a> *</span></label>
         <button class="btn btn-accent btn-lg" type="submit">Зарегистрироваться</button>
       </form>
     <?php endif; ?>

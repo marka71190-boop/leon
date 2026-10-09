@@ -60,12 +60,13 @@ if (is_post()) {
             $user = current_user();
             $pdo = db();
             $pdo->beginTransaction();
-            q('INSERT INTO orders (user_id, company, inn, contact, phone, email, city, comment, total_qty, total_sum, status, updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', [
+            q('INSERT INTO orders (user_id, company, inn, contact, phone, email, city, comment, total_qty, total_sum, status, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)', [
                 $user['id'] ?? null, $old['company'], $old['inn'], $old['contact'], $old['phone'], $old['email'],
-                $old['city'], $old['comment'], $total, $sum, 'new', date('Y-m-d H:i:s'),
+                $old['city'], $old['comment'], $total, $sum, 'new', date('Y-m-d H:i:s'), date('Y-m-d H:i:s'),
             ]);
             $orderId = (int)$pdo->lastInsertId();
+            consent_log('order', ['pd', 'oferta'], $old, isset($user['id']) ? (int)$user['id'] : null, $orderId);
             foreach ($items as $it) {
                 q('INSERT INTO order_items (order_id, product_id, name, size, price, qty) VALUES (?,?,?,?,?,?)',
                     [$orderId, $it['id'], $it['name'], $it['size'], $it['price'], $it['qty']]);
