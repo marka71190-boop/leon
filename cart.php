@@ -13,11 +13,10 @@ if (is_post()) {
         $pid = (int)post('product_id');
         $p = q('SELECT * FROM products WHERE id = ? AND active = 1', [$pid])->fetch();
         if ($p) {
-            $step = product_step($p);
-            $qty = max($step, (int)ceil(max(1, (int)post('qty')) / $step) * $step);
+            $qty = qty_from_input($p, post('qty'));
             $was = isset(cart_raw()[$pid]);
             cart_set($pid, $qty);
-            flash(($was ? 'Количество обновлено: ' : 'Добавлено в корзину: ') . $p['name'] . ' ' . $p['size'] . ' — ' . fmt_qty($qty) . ' шт.');
+            flash(($was ? 'Количество обновлено: ' : 'Добавлено в корзину: ') . $p['name'] . ' ' . $p['size'] . ' — ' . fmt_packs($qty, product_pack($p)));
         }
         back('cart.php');
     }
@@ -26,8 +25,7 @@ if (is_post()) {
         foreach ((array)($_POST['qty'] ?? []) as $pid => $qty) {
             $p = q('SELECT * FROM products WHERE id = ?', [(int)$pid])->fetch();
             if ($p) {
-                $step = product_step($p);
-                cart_set((int)$pid, max($step, (int)ceil(max(1, (int)$qty) / $step) * $step));
+                cart_set((int)$pid, qty_from_input($p, $qty));
             }
         }
         redirect('cart.php');
@@ -67,9 +65,10 @@ if (is_post()) {
             ]);
             $orderId = (int)$pdo->lastInsertId();
             consent_log('order', ['pd', 'oferta'], $old, isset($user['id']) ? (int)$user['id'] : null, $orderId);
+            order_event($orderId, 'new', 'сайт');
             foreach ($items as $it) {
-                q('INSERT INTO order_items (order_id, product_id, name, size, price, qty) VALUES (?,?,?,?,?,?)',
-                    [$orderId, $it['id'], $it['name'], $it['size'], $it['price'], $it['qty']]);
+                q('INSERT INTO order_items (order_id, product_id, name, size, price, qty, pack_qty) VALUES (?,?,?,?,?,?,?)',
+                    [$orderId, $it['id'], $it['name'], $it['size'], $it['price'], $it['qty'], product_pack($it)]);
             }
             // Сохраняем реквизиты в профиль, если поля пустые
             if ($user) {
@@ -82,7 +81,7 @@ if (is_post()) {
             // Письма
             $lines = [];
             foreach ($items as $it) {
-                $lines[] = '— ' . $it['name'] . ' ' . $it['size'] . ': ' . fmt_qty($it['qty']) . ' шт.' . ((float)$it['price'] > 0 ? ' × ' . fmt_money($it['price']) : '');
+                $lines[] = '— ' . $it['name'] . ' ' . $it['size'] . ': ' . fmt_packs((int)$it['qty'], product_pack($it)) . ((float)$it['price'] > 0 ? ' × ' . fmt_money($it['price']) . '/шт.' : '');
             }
             $body = "Заявка № $orderId от " . date('d.m.Y H:i') . "\n\n"
                 . "Компания: {$old['company']}\nИНН: {$old['inn']}\nКонтактное лицо: {$old['contact']}\n"
@@ -108,14 +107,15 @@ if (is_post()) {
 
             $_SESSION['cart'] = [];
             $_SESSION['last_order'] = $orderId;
-            redirect('cart.php?done=' . $orderId);
+            $_SESSION['my_orders'] = array_slice(array_merge([$orderId], (array)($_SESSION['my_orders'] ?? [])), 0, 20);
+            redirect('order.php?id=' . $orderId);
         }
     }
 }
 
-$done = (int)($_GET['done'] ?? 0);
-if ($done && ($_SESSION['last_order'] ?? 0) !== $done) {
-    $done = 0;
+// Старые ссылки вида cart.php?done=N ведут на страницу подтверждения заказа
+if (isset($_GET['done'])) {
+    redirect('order.php?id=' . (int)$_GET['done']);
 }
 
 $items = cart_items();
@@ -135,18 +135,7 @@ page_header('Корзина');
 <div class="container page-pad">
   <h1 style="margin-top:28px">Корзина</h1>
 
-<?php if ($done): ?>
-  <div class="done-box">
-    <span class="done-icon"><?= icon('check', 26) ?></span>
-    <h2 style="margin:0">Заявка № <?= $done ?> принята</h2>
-    <p style="margin:0; font-size:17px; color:var(--text-2)"><?= e(setting('order_success')) ?> Копия заявки отправлена на ваш email.</p>
-    <div class="hero-actions">
-      <?php if ($user): ?><a class="btn btn-accent" href="<?= url('account.php') ?>">Статус в личном кабинете</a><?php endif; ?>
-      <a class="btn btn-outline" href="<?= url('catalog.php') ?>">Вернуться в каталог</a>
-    </div>
-  </div>
-
-<?php elseif (!$items): ?>
+<?php if (!$items): ?>
   <div class="empty">
     <p style="margin:0 0 16px">В корзине пока пусто.</p>
     <a class="btn btn-accent" href="<?= url('catalog.php') ?>">Перейти в каталог</a>
@@ -170,7 +159,7 @@ page_header('Корзина');
         <?= csrf_field() ?><input type="hidden" name="action" value="update">
         <div class="table-wrap has-cards">
           <table class="table cards">
-            <thead><tr><th><span class="sr-only">Фото</span></th><th>Товар</th><th class="num">Цена</th><th>Количество, шт.</th><th class="num">Сумма</th></tr></thead>
+            <thead><tr><th><span class="sr-only">Фото</span></th><th>Товар</th><th class="num">Цена</th><th>Количество</th><th class="num">Сумма</th></tr></thead>
             <tbody>
             <?php foreach ($items as $it): ?>
               <tr>
@@ -178,7 +167,7 @@ page_header('Корзина');
                 <td><a class="pname" href="<?= url('product.php?id=' . $it['id']) ?>"><?= e($it['name']) ?></a><div class="sub"><?= e($it['size']) ?><?= $it['pack_qty'] ? ' · ' . fmt_qty($it['pack_qty']) . ' шт./уп.' : '' ?></div></td>
                 <td class="num price"><?= price_label($it) ?></td>
                 <td class="c-act"><div class="row-form" style="justify-content:flex-start">
-                  <?= qty_input('qty[' . $it['id'] . ']', $it['qty'], product_step($it)) ?>
+                  <?= qty_input('qty[' . $it['id'] . ']', product_pack($it) ? (int)ceil($it['qty'] / product_pack($it)) : (int)$it['qty'], product_step($it), '', product_pack($it)) ?>
                   <button class="icon-btn" type="submit" form="rm-<?= $it['id'] ?>" aria-label="Удалить <?= e($it['name']) ?>"><?= icon('trash', 20) ?></button>
                 </div></td>
                 <td class="num c-hide"><?= $showSum && $it['line_sum'] > 0 ? fmt_money($it['line_sum']) : '—' ?></td>

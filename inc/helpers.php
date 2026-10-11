@@ -223,21 +223,81 @@ function product_step(array $p): int
     return $s > 0 ? $s : max(1, (int)setting('default_step'));
 }
 
-function order_statuses(): array
+/**
+ * Этапы заказа по порядку: название для менеджера, название для клиента, что сделать менеджеру на этом этапе.
+ * Менеджер переводит заказ на следующий этап одной кнопкой в карточке заказа.
+ */
+function order_steps(): array
 {
     return [
-        'new'       => 'Заявка принята',
-        'confirmed' => 'Согласован',
-        'payment'   => 'Ожидает оплаты',
-        'shipped'   => 'Передан в ТК',
-        'done'      => 'Получен',
-        'cancelled' => 'Отменён',
+        'new'       => ['Новый', 'Заявка принята', 'Позвоните клиенту: подтвердите состав, количество и реквизиты.'],
+        'contacted' => ['Связались', 'Менеджер связался с вами', 'Согласуйте транспортную компанию, адрес и стоимость доставки.'],
+        'delivery'  => ['Доставка согласована', 'Доставка согласована', 'Выставьте счёт и дождитесь оплаты.'],
+        'paid'      => ['Оплата подтверждена', 'Оплата получена', 'Соберите и отгрузите заказ. Номер накладной впишите в комментарий для клиента.'],
+        'shipped'   => ['Отгружен', 'Отгружен', 'Убедитесь, что клиент получил груз, и закройте заказ.'],
+        'closed'    => ['Закрыт', 'Выполнен', 'Заказ выполнен.'],
     ];
+}
+
+/** Все статусы для менеджера, включая «Отменён» */
+function order_statuses(): array
+{
+    return array_map(fn($s) => $s[0], order_steps()) + ['cancelled' => 'Отменён'];
 }
 
 function status_label(string $s): string
 {
     return order_statuses()[$s] ?? $s;
+}
+
+/** Название статуса для клиента (личный кабинет, письма) */
+function status_label_client(string $s): string
+{
+    return order_steps()[$s][1] ?? ($s === 'cancelled' ? 'Отменён' : $s);
+}
+
+/** Следующий этап или null, если заказ закрыт или отменён */
+function order_next_status(string $s): ?string
+{
+    $keys = array_keys(order_steps());
+    $i = array_search($s, $keys, true);
+    return ($i !== false && isset($keys[$i + 1])) ? $keys[$i + 1] : null;
+}
+
+/** Запись в историю заказа: кто и когда перевёл на этап */
+function order_event(int $orderId, string $status, string $who, string $note = ''): void
+{
+    q('INSERT INTO order_events (order_id, created_at, status, who, note) VALUES (?,?,?,?,?)', [$orderId, date('Y-m-d H:i:s'), $status, $who, $note]);
+}
+
+/* ---------- Упаковки ---------- */
+
+/** Штук в упаковке (0 — товар продаётся поштучно) */
+function product_pack(array $p): int
+{
+    return max(0, (int)($p['pack_qty'] ?? 0));
+}
+
+/** Количество в штуках из формы: для товаров с фасовкой покупатель указывает упаковки */
+function qty_from_input(array $p, $value): int
+{
+    $pack = product_pack($p);
+    if ($pack > 0) {
+        return max(1, (int)$value) * $pack;
+    }
+    $step = product_step($p);
+    return max($step, (int)ceil(max(1, (int)$value) / $step) * $step);
+}
+
+/** «10 уп. (5 000 шт.)», для штучных — «5 000 шт.» */
+function fmt_packs(int $qty, int $pack): string
+{
+    if ($pack <= 0) {
+        return fmt_qty($qty) . ' шт.';
+    }
+    $full = intdiv($qty, $pack);
+    $rest = $qty % $pack;
+    return fmt_qty($full) . ' уп.' . ($rest ? ' + ' . fmt_qty($rest) . ' шт.' : '') . ' (' . fmt_qty($qty) . ' шт.)';
 }
 
 function normalize_phone(string $p): string

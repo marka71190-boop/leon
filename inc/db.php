@@ -86,6 +86,29 @@ CREATE TABLE IF NOT EXISTS consent_docs (
 SQL);
         $pdo->exec("INSERT INTO settings (key, value) VALUES ('db_version', '3') ON CONFLICT(key) DO UPDATE SET value = '3'");
     }
+    if ($v < 4) {
+        // Этапы заказа: новый → связались → доставка → оплата → отгружен → закрыт, история смены этапов
+        $pdo->exec(<<<SQL
+CREATE TABLE IF NOT EXISTS order_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, order_id INTEGER NOT NULL, created_at TEXT NOT NULL,
+  status TEXT NOT NULL, who TEXT DEFAULT '', note TEXT DEFAULT '');
+CREATE INDEX IF NOT EXISTS order_events_order ON order_events(order_id);
+SQL);
+        $map = ['confirmed' => 'delivery', 'payment' => 'delivery', 'done' => 'closed'];
+        $st = $pdo->prepare('UPDATE orders SET status = ? WHERE status = ?');
+        foreach ($map as $old => $new) {
+            $st->execute([$new, $old]);
+        }
+        $pdo->exec("INSERT INTO order_events (order_id, created_at, status, who) SELECT id, created_at, 'new', 'сайт' FROM orders");
+        $pdo->exec("INSERT INTO order_events (order_id, created_at, status, who) SELECT id, COALESCE(updated_at, created_at), status, '' FROM orders WHERE status <> 'new'");
+        // Фасовка на момент заказа — чтобы показывать упаковки, даже если фасовку товара потом поменяют
+        $cols = array_column($pdo->query('PRAGMA table_info(order_items)')->fetchAll(), 'name');
+        if (!in_array('pack_qty', $cols, true)) {
+            $pdo->exec('ALTER TABLE order_items ADD COLUMN pack_qty INTEGER DEFAULT 0');
+            $pdo->exec('UPDATE order_items SET pack_qty = COALESCE((SELECT pack_qty FROM products p WHERE p.id = order_items.product_id), 0)');
+        }
+        $pdo->exec("INSERT INTO settings (key, value) VALUES ('db_version', '4') ON CONFLICT(key) DO UPDATE SET value = '4'");
+    }
 }
 
 function table_exists(PDO $pdo, string $name): bool
@@ -190,7 +213,7 @@ function demo_seed(PDO $pdo): void
     $uid = (int)$pdo->lastInsertId();
     $pdo->prepare('INSERT INTO orders (user_id, company, inn, contact, phone, email, city, comment, total_qty, total_sum, status, manager_note, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
         ->execute([$uid, 'ООО «Пример» (демо)', '2300000000', 'Демо Покупатель', '+7 900 000-00-00', 'demo@leonpro.ru', 'Краснодар',
-                   'Демонстрационный заказ', 6000, 0, 'confirmed', 'Это пример заказа для демонстрации', date('Y-m-d H:i:s')]);
+                   'Демонстрационный заказ', 6000, 0, 'contacted', 'Это пример заказа для демонстрации', date('Y-m-d H:i:s')]);
     $oid = (int)$pdo->lastInsertId();
     $st = $pdo->prepare('INSERT INTO order_items (order_id, product_id, name, size, price, qty) VALUES (?,?,?,?,?,?)');
     $st->execute([$oid, 2, 'Дюбель тарельчатый с пластиковым гвоздём', '10×120', 0, 4000]);

@@ -51,8 +51,8 @@ if (is_post()) {
 }
 
 $orders = q('SELECT * FROM orders WHERE user_id = ? ORDER BY id DESC', [$user['id']])->fetchAll();
-$active = array_values(array_filter($orders, fn($o) => !in_array($o['status'], ['done', 'cancelled'], true)));
-$stages = array_diff_key(order_statuses(), ['cancelled' => 1]);
+$active = array_values(array_filter($orders, fn($o) => !in_array($o['status'], ['closed', 'cancelled'], true)));
+$stages = array_map(fn($s) => $s[1], order_steps());
 $stageKeys = array_keys($stages);
 
 page_header('Личный кабинет');
@@ -95,12 +95,12 @@ page_header('Личный кабинет');
             <thead><tr><th>Заказ</th><th>Состав</th><th class="num">Количество</th><th>Статус</th><th></th></tr></thead>
             <tbody>
             <?php foreach ($orders as $o):
-                $its = q('SELECT name, size, qty FROM order_items WHERE order_id = ?', [$o['id']])->fetchAll(); ?>
+                $its = q('SELECT name, size, qty, pack_qty FROM order_items WHERE order_id = ?', [$o['id']])->fetchAll(); ?>
               <tr>
                 <td><b>№ <?= $o['id'] ?></b><div class="sub"><?= date('d.m.Y', strtotime($o['created_at'])) ?></div></td>
-                <td class="small"><?= implode('<br>', array_map(fn($i) => e($i['name'] . ' ' . $i['size']) . ' — ' . fmt_qty($i['qty']) . ' шт.', $its)) ?></td>
+                <td class="small"><?= implode('<br>', array_map(fn($i) => e($i['name'] . ' ' . $i['size']) . ' — ' . fmt_packs((int)$i['qty'], (int)$i['pack_qty']), $its)) ?></td>
                 <td class="num"><?= fmt_qty($o['total_qty']) ?> шт.</td>
-                <td><span class="pill pill-<?= e($o['status']) ?>"><?= e(status_label($o['status'])) ?></span></td>
+                <td><span class="pill pill-<?= e($o['status']) ?>"><?= e(status_label_client($o['status'])) ?></span></td>
                 <td style="text-align:right"><form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="repeat"><input type="hidden" name="order_id" value="<?= $o['id'] ?>"><button class="btn btn-outline" type="submit">Повторить заказ</button></form></td>
               </tr>
             <?php endforeach; ?>

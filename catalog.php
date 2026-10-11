@@ -120,9 +120,11 @@ page_header($curCat['name'] ?? 'Каталог');
       <?php else: ?>
       <div class="table-wrap has-cards">
         <table class="table cards">
-          <thead><tr><th><span class="sr-only">Фото</span></th><th>Наименование</th><th>Размер</th><th>Фасовка</th><th class="num">Цена, опт</th><th>Количество, шт.</th></tr></thead>
+          <thead><tr><th><span class="sr-only">Фото</span></th><th>Наименование</th><th>Размер</th><th>Фасовка</th><th class="num">Цена, опт</th><th>Количество</th></tr></thead>
           <tbody>
-          <?php foreach ($rows as $p): $step = product_step($p); ?>
+          <?php foreach ($rows as $p): $step = product_step($p); $pack = product_pack($p);
+                $want = (int)($cart[$p['id']] ?? $step * 2);
+                $qtyValue = $pack ? max(1, (int)ceil($want / $pack)) : max($step, $want); ?>
             <tr>
               <td class="c-img"><a href="<?= url('product.php?id=' . $p['id']) ?>"><?= product_thumb($p) ?></a></td>
               <td><a class="pname" href="<?= url('product.php?id=' . $p['id']) ?>"><?= e($p['name']) ?></a>
@@ -133,7 +135,7 @@ page_header($curCat['name'] ?? 'Каталог');
               <td class="c-act">
                 <form class="row-form" method="post" action="<?= url('cart.php') ?>">
                   <?= csrf_field() ?><input type="hidden" name="action" value="add"><input type="hidden" name="product_id" value="<?= $p['id'] ?>">
-                  <?= qty_input('qty', max($step, (int)($cart[$p['id']] ?? $step * 2)), $step) ?>
+                  <?= qty_input('qty', $qtyValue, $step, '', $pack) ?>
                   <?php if (isset($cart[$p['id']])): ?>
                     <button class="btn btn-outline" type="submit">Обновить</button>
                   <?php else: ?>

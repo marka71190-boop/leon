@@ -13,15 +13,19 @@ if (!$p) {
 $docs = q('SELECT * FROM documents WHERE product_id = ? ORDER BY sort, id', [$id])->fetchAll();
 $related = q('SELECT * FROM products WHERE category_id IS ? AND id <> ? AND active = 1 ORDER BY sort, id LIMIT 4', [$p['category_id'], $id])->fetchAll();
 $step = product_step($p);
+$pack = product_pack($p);
 $cart = cart_raw();
 $inCart = isset($cart[$id]);
+// Сколько показать в поле: уже в корзине или столько, чтобы набрать минимальный заказ
+$wantQty = (int)($cart[$id] ?? max(min_order(), $pack, $step));
+$qtyValue = $pack ? (int)ceil($wantQty / $pack) : max($step, (int)ceil($wantQty / $step) * $step);
 
 $specs = [];
 if ($p['size']) $specs[] = ['Размер', $p['size']];
 if ($p['type']) $specs[] = ['Тип', $p['type']];
 if ($p['material']) $specs[] = ['Материал', $p['material']];
 if ($p['pack_qty']) $specs[] = ['Фасовка', fmt_qty($p['pack_qty']) . ' шт. в упаковке'];
-$specs[] = ['Кратность заказа', fmt_qty($step) . ' шт.'];
+$specs[] = ['Как заказать', $pack ? 'Упаковками по ' . fmt_qty($pack) . ' шт.' : 'Кратно ' . fmt_qty($step) . ' шт.'];
 foreach (preg_split('~\R~u', (string)$p['specs']) as $line) {
     if (str_contains($line, ':')) {
         [$k, $v] = array_map('trim', explode(':', $line, 2));
@@ -51,13 +55,14 @@ page_header($p['name'] . ($p['size'] ? ' ' . $p['size'] : ''), ['description' =>
 
       <form class="buy-box" method="post" action="<?= url('cart.php') ?>">
         <?= csrf_field() ?><input type="hidden" name="action" value="add"><input type="hidden" name="product_id" value="<?= $id ?>">
-        <div class="buy-price"><span class="muted"><?= e(setting('price_note')) ?></span><b><?= price_label($p) ?><?php if (price_label($p) !== 'По запросу'): ?><span class="muted" style="font:500 15px var(--font)"> / шт.</span><?php endif; ?></b></div>
+        <div class="buy-price"><span class="muted"><?= e(setting('price_note')) ?></span><b><?= price_label($p) ?><?php if (price_label($p) !== 'По запросу'): ?><span class="muted" style="font:500 15px var(--font)"> / шт.</span><?php endif; ?></b>
+          <?php if ($pack && price_label($p) !== 'По запросу'): ?><span class="muted small"><?= fmt_money((float)$p['price'] * $pack) ?> за упаковку (<?= fmt_qty($pack) ?> шт.)</span><?php endif; ?></div>
         <div class="buy-row">
-          <?= qty_input('qty', max($step, (int)($cart[$id] ?? ceil(min_order() / $step) * $step)), $step) ?>
+          <?= qty_input('qty', $qtyValue, $step, '', $pack) ?>
           <button class="btn btn-accent btn-lg" type="submit"><?= $inCart ? 'Обновить в корзине' : 'Добавить в корзину' ?></button>
         </div>
         <?php if ($inCart): ?><a href="<?= url('cart.php') ?>"><b>Товар в корзине — перейти к оформлению →</b></a><?php endif; ?>
-        <span class="muted small">Минимальный заказ — <?= fmt_qty(min_order()) ?> шт. по всей корзине. Заказ кратен <?= fmt_qty($step) ?> шт.</span>
+        <span class="muted small">Минимальный заказ — <?= fmt_qty(min_order()) ?> шт. по всей корзине. <?= $pack ? 'Укажите количество упаковок, в упаковке ' . fmt_qty($pack) . ' шт.' : 'Заказ кратен ' . fmt_qty($step) . ' шт.' ?></span>
       </form>
 
       <div data-tabs>

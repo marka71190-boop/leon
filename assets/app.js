@@ -3,12 +3,19 @@
   // Степпер количества
   document.querySelectorAll('[data-stepper]').forEach(function (box) {
     var step = parseInt(box.dataset.step, 10) || 1;
+    var pack = parseInt(box.dataset.pack, 10) || 0;
     var input = box.querySelector('input');
+    var pieces = box.parentNode.querySelector('[data-pieces]');
+    function showPieces() {
+      if (pieces && pack) pieces.textContent = '= ' + ((parseInt(input.value, 10) || 0) * pack).toLocaleString('ru-RU') + ' шт.';
+    }
     function set(v) {
       v = Math.max(step, Math.round(v / step) * step);
       input.value = v;
+      showPieces();
       input.dispatchEvent(new Event('change', { bubbles: true }));
     }
+    input.addEventListener('input', showPieces);
     box.querySelector('[data-dec]').addEventListener('click', function () { set((parseInt(input.value, 10) || 0) - step); });
     box.querySelector('[data-inc]').addEventListener('click', function () { set((parseInt(input.value, 10) || 0) + step); });
     input.addEventListener('blur', function () { set(parseInt(input.value, 10) || step); });

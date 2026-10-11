@@ -72,6 +72,7 @@ function page_header(string $title = '', array $opt = []): void
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($siteTitle) ?></title>
 <meta name="description" content="<?= e($desc) ?>">
+<?php if (!empty($opt['robots'])): ?><meta name="robots" content="<?= e($opt['robots']) ?>"><?php endif; ?>
 <link rel="icon" href="<?= url('assets/favicon.svg') ?>" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -177,13 +178,27 @@ function page_footer(): void
 }
 
 /** Поле количества со степпером */
-function qty_input(string $name, int $value, int $step, string $id = ''): string
+/**
+ * Поле количества со стрелками. Для товара с фасовкой ($pack > 0) покупатель вводит упаковки,
+ * а под полем видно, сколько это штук.
+ */
+function qty_input(string $name, int $value, int $step, string $id = '', int $pack = 0): string
 {
-    $id = $id ?: $name . '-' . bin2hex(random_bytes(3));
-    return '<div class="stepper" data-stepper data-step="' . $step . '">'
+    $id = $id ?: preg_replace('~[^a-z0-9_-]~i', '-', $name) . '-' . bin2hex(random_bytes(3));
+    if ($pack > 0) {
+        $value = max(1, $value);
+        return '<div class="qty-box"><div class="stepper" data-stepper data-step="1" data-pack="' . $pack . '">'
+            . '<button type="button" data-dec aria-label="Убрать упаковку">−</button>'
+            . '<input type="number" id="' . e($id) . '" name="' . e($name) . '" value="' . $value . '" min="1" step="1" inputmode="numeric" aria-label="Количество упаковок по ' . fmt_qty($pack) . ' шт.">'
+            . '<span class="stepper-unit">уп.</span>'
+            . '<button type="button" data-inc aria-label="Добавить упаковку">+</button></div>'
+            . '<span class="qty-pieces" data-pieces>= ' . fmt_qty($value * $pack) . ' шт.</span></div>';
+    }
+    return '<div class="qty-box"><div class="stepper" data-stepper data-step="' . $step . '">'
         . '<button type="button" data-dec aria-label="Уменьшить на ' . $step . '">−</button>'
         . '<input type="number" id="' . e($id) . '" name="' . e($name) . '" value="' . $value . '" min="' . $step . '" step="' . $step . '" inputmode="numeric" aria-label="Количество, шт.">'
-        . '<button type="button" data-inc aria-label="Увеличить на ' . $step . '">+</button></div>';
+        . '<span class="stepper-unit">шт.</span>'
+        . '<button type="button" data-inc aria-label="Увеличить на ' . $step . '">+</button></div></div>';
 }
 
 function product_thumb(array $p, string $class = 'thumb'): string

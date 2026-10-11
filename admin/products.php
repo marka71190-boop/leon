@@ -133,8 +133,8 @@ if (isset($_GET['edit'])) {
         <h2>Цена и фасовка</h2>
         <div class="a-grid">
           <?= a_input('price', 'Оптовая цена, ₽ за шт.', $p['price'] > 0 ? rtrim(rtrim(number_format((float)$p['price'], 2, '.', ''), '0'), '.') : '', 'text', '0 или пусто — «По запросу»', ['inputmode' => 'decimal']) ?>
-          <?= a_input('pack_qty', 'Штук в упаковке', $p['pack_qty'] ?: '', 'number', '', ['min' => 0]) ?>
-          <?= a_input('step', 'Кратность заказа, шт.', $p['step'] ?: '', 'number', 'Пусто — по умолчанию (' . setting('default_step') . ' шт.)', ['min' => 0]) ?>
+          <?= a_input('pack_qty', 'Штук в упаковке', $p['pack_qty'] ?: '', 'number', 'Покупатель заказывает упаковками. Пусто — товар заказывают поштучно', ['min' => 0]) ?>
+          <?= a_input('step', 'Кратность заказа, шт. (если нет фасовки)', $p['step'] ?: '', 'number', 'Только для товаров без фасовки. Пусто — по умолчанию (' . setting('default_step') . ' шт.)', ['min' => 0]) ?>
         </div>
       </div>
       <div class="a-card">
