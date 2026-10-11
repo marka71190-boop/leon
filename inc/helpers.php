@@ -110,15 +110,20 @@ function upload_url(?string $rel): string
     return str_starts_with($rel, 'assets/') ? url($rel) : url('uploads/' . $rel);
 }
 
-/** Блок реквизитов для страниц (метка {{реквизиты}} в тексте страницы) */
-function requisites_html(): string
+/**
+ * Блок реквизитов для страниц: метка {{реквизиты}} — полностью, с банком;
+ * метка {{оператор}} — без банковских реквизитов (для политики персональных данных).
+ */
+function requisites_html(bool $withBank = true): string
 {
     $rows = [
         [setting('legal_name'), ''],
         ['ИНН', setting('legal_inn')], ['ОГРНИП', setting('legal_ogrn')], ['ОКПО', setting('legal_okpo')],
         ['Юридический адрес', setting('legal_address')],
-        ['Банк', setting('bank_name')], ['Р/с', setting('bank_account')], ['К/с', setting('bank_corr')], ['БИК', setting('bank_bik')],
     ];
+    if ($withBank) {
+        array_push($rows, ['Банк', setting('bank_name')], ['Р/с', setting('bank_account')], ['К/с', setting('bank_corr')], ['БИК', setting('bank_bik')]);
+    }
     $h = '<dl class="requisites">';
     foreach ($rows as [$k, $v]) {
         if ($v === '' && $k === setting('legal_name')) {
@@ -133,8 +138,8 @@ function requisites_html(): string
 /** Подстановка меток в тексты страниц */
 function render_content(string $html): string
 {
-    return str_replace(['{{реквизиты}}', '{{requisites}}', '{{продавец}}', '{{телефон}}'],
-        [requisites_html(), requisites_html(), e(setting('legal_name')), e(setting('phone'))], $html);
+    return str_replace(['{{реквизиты}}', '{{requisites}}', '{{оператор}}', '{{продавец}}', '{{телефон}}'],
+        [requisites_html(), requisites_html(), requisites_html(false), e(setting('legal_name')), e(setting('phone'))], $html);
 }
 
 function redirect(string $path): never

@@ -117,6 +117,11 @@ SQL);
         }
         $pdo->exec("INSERT INTO settings (key, value) VALUES ('db_version', '5') ON CONFLICT(key) DO UPDATE SET value = '5'");
     }
+    if ($v < 6) {
+        // В политике персональных данных у оператора — без банковских реквизитов
+        $pdo->exec("UPDATE pages SET content = REPLACE(content, '{{реквизиты}}', '{{оператор}}') WHERE slug = 'privacy'");
+        $pdo->exec("INSERT INTO settings (key, value) VALUES ('db_version', '6') ON CONFLICT(key) DO UPDATE SET value = '6'");
+    }
 }
 
 function table_exists(PDO $pdo, string $name): bool
@@ -295,7 +300,7 @@ function page_seed_privacy(): string
 <h2>Цели обработки</h2>
 <p>Обработка заявок, связь с покупателем, исполнение договора поставки.</p>
 <h2>Оператор</h2>
-{{реквизиты}}
+{{оператор}}
 <p>Телефон: {{телефон}}</p>
 HTML;
 }
