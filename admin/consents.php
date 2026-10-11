@@ -100,7 +100,7 @@ admin_header('Согласия', 'consents');
     <button class="a-btn a-btn-dark a-btn-sm" type="submit">Найти</button>
   </form>
 </div>
-<?php if ($userId): ?><p>Показаны согласия одного клиента. <a href="<?= e($qs(['user' => ''])) ?>">Показать все</a></p><?php endif; ?>
+<?php if ($userId): ?><p>Показаны согласия одного клиента. <a href="<?= url('admin/consent_doc.php?user=' . $userId) ?>" target="_blank"><b>Документы-согласия клиента для печати</b></a> · <a href="<?= e($qs(['user' => ''])) ?>">Показать все</a></p><?php endif; ?>
 <?php if (!$rows): ?>
   <div class="a-card a-muted">Согласий пока нет. Они появятся, когда клиенты начнут регистрироваться и отправлять заявки.</div>
 <?php else: ?>
@@ -122,7 +122,8 @@ admin_header('Согласия', 'consents');
         <div class="a-muted" style="font-size:13px"><?= e(trim($r['contact'] !== $name ? $r['contact'] : '')) ?> <?= e($r['email']) ?> <?= e($r['phone']) ?></div>
       </td>
       <td style="font-size:13px" title="<?= e($r['user_agent']) ?>"><?= e($r['ip'] ?: '—') ?></td>
-      <td style="font-size:13px"><?php if ($r['doc_hash']): ?><a href="<?= url('admin/consents.php?doc=' . urlencode($r['doc_hash'])) ?>">редакция <?= e(substr($r['doc_hash'], 0, 6)) ?></a><?php endif; ?></td>
+      <td style="font-size:13px; white-space:nowrap"><a class="a-btn a-btn-out a-btn-sm" href="<?= url('admin/consent_doc.php?id=' . (int)$r['id']) ?>" target="_blank">Документ</a>
+        <?php if ($r['doc_hash']): ?><div style="margin-top:4px"><a href="<?= url('admin/consents.php?doc=' . urlencode($r['doc_hash'])) ?>">редакция <?= e(substr($r['doc_hash'], 0, 6)) ?></a></div><?php endif; ?></td>
       <td>
         <?php if (!$r['revoked_at']): ?>
           <details><summary class="a-btn a-btn-out a-btn-sm">Отметить отзыв</summary>

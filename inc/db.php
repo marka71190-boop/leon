@@ -109,6 +109,14 @@ SQL);
         }
         $pdo->exec("INSERT INTO settings (key, value) VALUES ('db_version', '4') ON CONFLICT(key) DO UPDATE SET value = '4'");
     }
+    if ($v < 5) {
+        // Адрес сайта, на котором дано согласие (для документа-согласия)
+        $cols = array_column($pdo->query('PRAGMA table_info(consents)')->fetchAll(), 'name');
+        if (!in_array('site', $cols, true)) {
+            $pdo->exec("ALTER TABLE consents ADD COLUMN site TEXT DEFAULT ''");
+        }
+        $pdo->exec("INSERT INTO settings (key, value) VALUES ('db_version', '5') ON CONFLICT(key) DO UPDATE SET value = '5'");
+    }
 }
 
 function table_exists(PDO $pdo, string $name): bool

@@ -70,7 +70,7 @@ if ($id) {
       <div class="a-table-wrap"><table class="a-table"><tbody>
         <?php foreach ($consents as $c): ?><tr><td style="white-space:nowrap"><?= date('d.m.Y H:i', strtotime($c['created_at'])) ?></td><td><?= e(consent_kinds()[$c['kind']][0] ?? $c['kind']) ?><?= $c['revoked_at'] ? ' <span style="color:#B42318">(отозвано)</span>' : '' ?></td><td><?= e(consent_sources()[$c['source']] ?? $c['source']) ?><?= $c['order_id'] ? ', заявка № ' . (int)$c['order_id'] : '' ?></td><td class="a-muted">IP <?= e($c['ip'] ?: '—') ?></td></tr><?php endforeach; ?>
       </tbody></table></div>
-      <p style="margin:10px 0 0"><a href="<?= url('admin/consents.php?user=' . $id) ?>">Все согласия клиента →</a></p>
+      <p style="margin:10px 0 0; display:flex; gap:14px; flex-wrap:wrap"><a class="a-btn a-btn-out a-btn-sm" href="<?= url('admin/consent_doc.php?user=' . $id) ?>" target="_blank">Документы-согласия (печать / PDF)</a><a href="<?= url('admin/consents.php?user=' . $id) ?>">Все согласия клиента в журнале →</a></p>
       <?php endif; ?>
     </div>
     <form method="post" data-confirm="Удалить аккаунт клиента? Заказы и журнал согласий останутся."><?= csrf_field() ?><input type="hidden" name="action" value="delete"><input type="hidden" name="id" value="<?= $id ?>"><button class="a-btn a-btn-danger a-btn-sm" type="submit">Удалить клиента</button></form>

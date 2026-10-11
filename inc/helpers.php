@@ -581,11 +581,11 @@ function consent_log(string $source, array $kinds, array $who, ?int $userId = nu
         $content = $page ? render_content((string)$page['content']) : '';
         $hash = substr(hash('sha256', $title . "\n" . $content), 0, 16);
         q('INSERT OR IGNORE INTO consent_docs (hash, slug, title, content, created_at) VALUES (?,?,?,?,?)', [$hash, $slug, $title, $content, $now]);
-        q('INSERT INTO consents (created_at, source, kind, user_id, order_id, company, contact, email, phone, ip, user_agent, checkbox_text, doc_hash)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)', [
+        q('INSERT INTO consents (created_at, source, kind, user_id, order_id, company, contact, email, phone, ip, user_agent, checkbox_text, doc_hash, site)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [
             $now, $source, $kind, $userId, $orderId,
             (string)($who['company'] ?? ''), (string)($who['contact'] ?? ''), (string)($who['email'] ?? ''), (string)($who['phone'] ?? ''),
-            client_ip(), mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 300), $text, $hash,
+            client_ip(), mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 300), $text, $hash, site_base_url(),
         ]);
     }
 }

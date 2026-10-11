@@ -185,7 +185,7 @@ if ($id) {
           <?= a_input('city', 'Город доставки', $o['city']) ?>
         </div>
         <?php if ($o['comment']): ?><p style="margin:14px 0 0"><b>Комментарий клиента:</b> <?= nl2br(e($o['comment'])) ?></p><?php endif; ?>
-        <p class="a-muted" style="margin:10px 0 0">Согласия: <?php if ($consents): ?><?= e(implode(', ', array_map(fn($c) => (consent_kinds()[$c['kind']][0] ?? $c['kind']) . ' ✓' . ($c['revoked_at'] ? ' (отозвано)' : ''), $consents))) ?> · <?= date('d.m.Y H:i:s', strtotime($consents[0]['created_at'])) ?> · IP <?= e($consents[0]['ip'] ?: '—') ?> · <a href="<?= url('admin/consents.php?q=' . $id) ?>">в журнале</a><?php else: ?>не записаны (заявка оформлена до появления журнала)<?php endif; ?></p>
+        <p class="a-muted" style="margin:10px 0 0">Согласия: <?php if ($consents): ?><?= e(implode(', ', array_map(fn($c) => (consent_kinds()[$c['kind']][0] ?? $c['kind']) . ' ✓' . ($c['revoked_at'] ? ' (отозвано)' : ''), $consents))) ?> · <?= date('d.m.Y H:i:s', strtotime($consents[0]['created_at'])) ?> · IP <?= e($consents[0]['ip'] ?: '—') ?> · <a href="<?= url('admin/consent_doc.php?order=' . $id) ?>" target="_blank">документ-согласие</a> · <a href="<?= url('admin/consents.php?q=' . $id) ?>">в журнале</a><?php else: ?>не записаны (заявка оформлена до появления журнала)<?php endif; ?></p>
       </div>
       <div class="a-card">
         <h2>Комментарий для клиента</h2>
