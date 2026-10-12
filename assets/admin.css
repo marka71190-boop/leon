@@ -123,3 +123,26 @@ h2 { font-size: 18px; margin: 0 0 14px; }
 }
 .a-tg { margin-top: 18px; padding: 16px; border-radius: 8px; background: var(--soft); border: 1px solid var(--line); font-size: 14px; }
 .a-tg code { background: #fff; padding: 1px 5px; border-radius: 4px; border: 1px solid var(--line); }
+
+/* Права администраторов */
+.a-roles { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+.a-role { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border: 1px solid #BFC2C7; border-radius: 8px; cursor: pointer; background: #fff; }
+.a-role:has(input:checked) { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); }
+.a-role input { margin-top: 3px; width: 18px; height: 18px; accent-color: var(--ink); }
+.a-role span { display: flex; flex-direction: column; gap: 2px; }
+.a-role small { color: var(--muted); }
+.a-perms { border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; margin: 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 2px 16px; }
+.a-perms legend { font-weight: 600; font-size: 14px; padding: 0 4px; }
+.a-roles:has(input[value=owner]:checked) + .a-perms { opacity: .45; pointer-events: none; }
+
+/* Фото товара */
+.a-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.a-photo { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
+.a-photo img { width: 100%; aspect-ratio: 1 / 1; object-fit: contain; background: var(--soft); display: block; }
+.a-photo.is-main { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.a-photo-bar { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; align-items: center; }
+.a-photo-bar button { min-height: 30px; padding: 0 8px; border: 1px solid #BFC2C7; background: #fff; border-radius: 5px; cursor: pointer; font: inherit; font-size: 12px; }
+.a-photo-bar button:hover { border-color: var(--ink); }
+.a-photo-bar .del { color: #A31515; border-color: #E8B4B4; margin-left: auto; }
+.a-photo-main { font-size: 12px; font-weight: 700; color: #7A3A08; background: #FFE4CC; border-radius: 5px; padding: 4px 8px; }
+

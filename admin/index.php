@@ -1,32 +1,41 @@
 <?php
 require dirname(__DIR__) . '/inc/bootstrap.php';
 require __DIR__ . '/_layout.php';
-require_admin();
+$me = require_admin();
 
-$stats = [
-    ['Новых заявок', (int)q("SELECT COUNT(*) FROM orders WHERE status='new'")->fetchColumn(), 'admin/orders.php?status=new'],
-    ['Заказов в работе', (int)q("SELECT COUNT(*) FROM orders WHERE status IN ('contacted','delivery','paid','shipped')")->fetchColumn(), 'admin/orders.php'],
-    ['Товаров на сайте', (int)q('SELECT COUNT(*) FROM products WHERE active=1')->fetchColumn(), 'admin/products.php'],
-    ['Клиентов', (int)q('SELECT COUNT(*) FROM users')->fetchColumn(), 'admin/clients.php'],
-];
-$recent = q('SELECT * FROM orders ORDER BY id DESC LIMIT 8')->fetchAll();
-$placeholders = [];
-foreach (['phone' => 'Телефон', 'email' => 'Email', 'address' => 'Адрес', 'work_hours' => 'Часы работы'] as $k => $l) {
-    if (str_contains(setting($k), '[')) $placeholders[] = $l;
+// Обзор показывает только то, к чему у администратора есть доступ
+$canOrders = admin_can($me, 'orders');
+$canProducts = admin_can($me, 'products');
+$canSettings = admin_can($me, 'settings');
+$stats = [];
+if ($canOrders) {
+    $stats[] = ['Новых заявок', (int)q("SELECT COUNT(*) FROM orders WHERE status='new'")->fetchColumn(), 'admin/orders.php?status=new'];
+    $stats[] = ['Заказов в работе', (int)q("SELECT COUNT(*) FROM orders WHERE status IN ('new','contacted','delivery','paid','shipped')")->fetchColumn(), 'admin/orders.php'];
 }
-$noPrice = (int)q('SELECT COUNT(*) FROM products WHERE active=1 AND price<=0')->fetchColumn();
-$noPack = (int)q('SELECT COUNT(*) FROM products WHERE active=1 AND COALESCE(pack_qty,0)<=0')->fetchColumn();
+if ($canProducts) $stats[] = ['Товаров на сайте', (int)q('SELECT COUNT(*) FROM products WHERE active=1')->fetchColumn(), 'admin/products.php'];
+if (admin_can($me, 'clients')) $stats[] = ['Клиентов', (int)q('SELECT COUNT(*) FROM users')->fetchColumn(), 'admin/clients.php'];
+$recent = $canOrders ? q('SELECT * FROM orders ORDER BY id DESC LIMIT 8')->fetchAll() : [];
+$placeholders = [];
+if ($canSettings) {
+    foreach (['phone' => 'Телефон', 'email' => 'Email', 'address' => 'Адрес', 'work_hours' => 'Часы работы'] as $k => $l) {
+        if (str_contains(setting($k), '[')) $placeholders[] = $l;
+    }
+}
+$noPrice = $canProducts ? (int)q('SELECT COUNT(*) FROM products WHERE active=1 AND price<=0')->fetchColumn() : 0;
+$noPack = $canProducts ? (int)q('SELECT COUNT(*) FROM products WHERE active=1 AND COALESCE(pack_qty,0)<=0')->fetchColumn() : 0;
+$noIndex = $canSettings && setting('seo_noindex') === '1';
 
 admin_header('Обзор', 'index');
 ?>
 <h1>Обзор</h1>
-<?php $notify = setting('tg_chats') !== '' || setting('manager_email') !== ''; if ($placeholders || !$notify || $noPrice || $noPack): ?>
+<?php $notify = !$canSettings || setting('tg_chats') !== '' || setting('manager_email') !== ''; if ($placeholders || !$notify || $noPrice || $noPack || $noIndex): ?>
 <div class="a-card" style="border-color:#F6C9A0; background:#FFF8F1">
   <h2>Что стоит заполнить</h2>
   <ul style="margin:0; padding-left:20px">
     <?php if ($placeholders): ?><li>В <a href="<?= url('admin/settings.php') ?>">настройках</a> остались заглушки: <?= e(implode(', ', $placeholders)) ?>.</li><?php endif; ?>
     <?php if (!$notify): ?><li>Не настроены <a href="<?= url('admin/settings.php#notify') ?>">уведомления о заявках</a>: подключите Telegram-бота, иначе новые заявки видны только здесь.</li><?php endif; ?>
     <?php if ($noPrice): ?><li>У <?= $noPrice ?> товаров нет цены — на сайте у них «По запросу». <a href="<?= url('admin/products.php') ?>">Открыть товары</a></li><?php endif; ?>
+    <?php if ($noIndex): ?><li>Сайт скрыт от поисковиков. Когда сайт готов, выключите это в <a href="<?= url('admin/settings.php#g-SEO') ?>">настройках SEO</a>.</li><?php endif; ?>
     <?php if ($noPack): ?><li>У <?= $noPack ?> товаров не указано «Штук в упаковке» — их заказывают поштучно, а не упаковками. <a href="<?= url('admin/products.php') ?>">Открыть товары</a></li><?php endif; ?>
   </ul>
 </div>
@@ -36,6 +45,7 @@ admin_header('Обзор', 'index');
     <a class="a-stat" href="<?= url($h) ?>"><b><?= $n ?></b><span><?= e($l) ?></span></a>
   <?php endforeach; ?>
 </div>
+<?php if ($canOrders): ?>
 <div class="a-head"><h2 style="margin:0">Последние заявки</h2><a href="<?= url('admin/orders.php') ?>">Все заказы</a></div>
 <?php if (!$recent): ?>
   <div class="a-card a-muted">Заявок пока нет.</div>
@@ -49,4 +59,6 @@ admin_header('Обзор', 'index');
   </tbody>
 </table></div>
 <?php endif; ?>
+<?php endif; ?>
+<?php if (!$stats && !$canOrders): ?><div class="a-card">Выберите раздел в меню слева.</div><?php endif; ?>
 <?php admin_footer();

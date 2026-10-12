@@ -130,7 +130,7 @@ if (!$old && $user) {
 $v = fn($k) => e($old[$k] ?? '');
 $showSum = setting('show_prices') === '1' && $sum > 0;
 
-page_header('Корзина');
+page_header('Корзина', ['robots' => 'noindex, follow']);
 ?>
 <div class="container page-pad">
   <h1 style="margin-top:28px">Корзина</h1>

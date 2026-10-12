@@ -52,6 +52,11 @@ function settings_schema(): array
 
         'seo_title'        => ['SEO', 'Заголовок сайта (title)', 'text', 'Leon_pro — тарельчатые дюбели, площадки под стяжку, якорные скобы и СВП оптом', ''],
         'seo_description'  => ['SEO', 'Описание (description)', 'textarea', 'Производитель крепежа для теплоизоляции и стяжки. Оптовые поставки со склада в Краснодаре.', ''],
+        'site_url'         => ['SEO', 'Адрес сайта', 'text', '', 'Например, https://leonpro.ru — для карты сайта и ссылок в поисковиках. Пусто — определяется сам'],
+        'seo_og_image'     => ['SEO', 'Картинка для соцсетей и мессенджеров', 'image', '', 'Показывается при отправке ссылки на сайт. Лучше 1200×630. Пусто — логотип'],
+        'yandex_verification' => ['SEO', 'Код подтверждения Яндекс.Вебмастера', 'text', '', 'Только код из meta-тега: content="…"'],
+        'google_verification' => ['SEO', 'Код подтверждения Google Search Console', 'text', '', 'Только код из meta-тега: content="…"'],
+        'seo_noindex'      => ['SEO', 'Скрыть сайт от поисковиков', 'bool', '0', 'Включите, пока сайт не готов. После запуска выключите'],
         'head_code'        => ['SEO', 'Код счётчиков (Яндекс.Метрика и т. п.)', 'code', '', 'Вставляется в <head> всех страниц'],
     ];
 }
@@ -444,13 +449,127 @@ function current_admin(): ?array
     return q('SELECT * FROM admins WHERE id = ?', [$_SESSION['admin_id']])->fetch() ?: null;
 }
 
-function require_admin(): array
+/** Разделы админки, доступ к которым можно выдать администратору */
+function admin_perms(): array
+{
+    return [
+        'orders'   => 'Заказы',
+        'products' => 'Товары, разделы каталога и документы',
+        'pages'    => 'Страницы сайта',
+        'clients'  => 'Клиенты',
+        'consents' => 'Журнал согласий',
+        'settings' => 'Настройки сайта (контакты, реквизиты, Telegram, SEO)',
+    ];
+}
+
+/** Есть ли у администратора доступ к разделу. Главный администратор может всё */
+function admin_can(?array $a, string $perm): bool
+{
+    if (!$a) {
+        return false;
+    }
+    if (!empty($a['is_owner'])) {
+        return true;
+    }
+    if ($perm === 'owner') {
+        return false;
+    }
+    return in_array($perm, array_filter(explode(',', (string)($a['perms'] ?? ''))), true);
+}
+
+/**
+ * Проверка входа в админку и доступа к разделу ($perm: orders, products, …, owner).
+ * Каждое действие (отправка формы) записывается в журнал действий администраторов.
+ */
+function require_admin(string $perm = ''): array
 {
     $a = current_admin();
     if (!$a) {
         redirect('admin/login.php');
     }
+    if ($perm !== '' && !admin_can($a, $perm)) {
+        flash('Нет доступа к этому разделу. Обратитесь к главному администратору.', 'error');
+        redirect('admin/index.php');
+    }
+    if (is_post()) {
+        admin_log_action($a, (string)($_POST['action'] ?? ''), (string)($_POST['id'] ?? ''));
+    }
     return $a;
+}
+
+function admin_log_action(array $a, string $action, string $target = ''): void
+{
+    q('INSERT INTO admin_log (created_at, admin_id, login, page, action, target, ip) VALUES (?,?,?,?,?,?,?)', [
+        date('Y-m-d H:i:s'), (int)$a['id'], (string)$a['login'], basename((string)($_SERVER['SCRIPT_NAME'] ?? '')),
+        mb_substr($action, 0, 40), mb_substr($target, 0, 40), client_ip(),
+    ]);
+}
+
+/* ---------- Фото товаров ---------- */
+
+/** Все фото товара по порядку; первое — главное */
+function product_images(int $productId): array
+{
+    return q('SELECT * FROM product_images WHERE product_id = ? ORDER BY sort, id', [$productId])->fetchAll();
+}
+
+/** Главное фото товара = первое в галерее (хранится в products.image для каталога) */
+function product_sync_cover(int $productId): void
+{
+    $first = q('SELECT file FROM product_images WHERE product_id = ? ORDER BY sort, id LIMIT 1', [$productId])->fetchColumn();
+    q('UPDATE products SET image = ? WHERE id = ?', [$first ?: '', $productId]);
+}
+
+/** Загрузка нескольких файлов из одного поля <input type="file" multiple> */
+function handle_uploads(string $field, array $allowedExt, string $subdir): array
+{
+    $f = $_FILES[$field] ?? null;
+    if (!$f || !is_array($f['name'])) {
+        return [];
+    }
+    $saved = [];
+    foreach (array_keys($f['name']) as $i) {
+        if (($f['error'][$i] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_NO_FILE) {
+            continue;
+        }
+        $_FILES['__one'] = ['name' => $f['name'][$i], 'type' => $f['type'][$i], 'tmp_name' => $f['tmp_name'][$i], 'error' => $f['error'][$i], 'size' => $f['size'][$i]];
+        $file = handle_upload('__one', $allowedExt, $subdir);
+        if ($file) {
+            $saved[] = $file;
+        }
+    }
+    unset($_FILES['__one']);
+    return $saved;
+}
+
+/* ---------- SEO ---------- */
+
+/** Адрес сайта для поисковиков: из настроек или текущий */
+function seo_base(): string
+{
+    $u = rtrim(trim(setting('site_url')), '/');
+    return preg_match('~^https?://~', $u) ? $u : rtrim(site_base_url(), '/');
+}
+
+/** Абсолютная ссылка (путь как у url(): «product.php?id=1») для canonical, карты сайта и соцсетей */
+function abs_url(string $path = ''): string
+{
+    if (preg_match('~^https?://~', $path)) {
+        return $path;
+    }
+    return seo_base() . '/' . ltrim($path, '/');
+}
+
+/** Обрезка текста для description по границе слова */
+function seo_cut(string $text, int $max = 160): string
+{
+    $t = trim(preg_replace('~\s+~u', ' ', html_entity_decode(strip_tags($text), ENT_QUOTES, 'UTF-8')));
+    if (mb_strlen($t) <= $max) {
+        return $t;
+    }
+    $cut = mb_substr($t, 0, $max - 1);
+    $sp = mb_strrpos($cut, ' ');
+    return rtrim($sp > $max * 0.6 ? mb_substr($cut, 0, $sp) : $cut, ' ,.;:—-') . '…';
 }
 
 /* ---------- Telegram ---------- */
@@ -593,5 +712,34 @@ function consent_log(string $source, array $kinds, array $who, ?int $userId = nu
             client_ip(), mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 300), $text, $hash, site_base_url(),
         ]);
     }
+}
+
+/** Хлебные крошки для поисковиков: [[название, путь], …] */
+function ld_breadcrumbs(array $items): array
+{
+    $list = [];
+    foreach (array_values($items) as $i => [$name, $path]) {
+        $list[] = ['@type' => 'ListItem', 'position' => $i + 1, 'name' => $name, 'item' => abs_url($path)];
+    }
+    return ['@context' => 'https://schema.org', '@type' => 'BreadcrumbList', 'itemListElement' => $list];
+}
+
+/** Организация для поисковиков (главная страница) */
+function ld_organization(): array
+{
+    $org = [
+        '@context' => 'https://schema.org', '@type' => 'Organization',
+        'name' => setting('site_name'), 'legalName' => setting('legal_name') ?: null,
+        'url' => abs_url(''), 'logo' => abs_url('assets/logo/leonpro-mark-for-light-bg.png'),
+        'telephone' => setting('phone') ?: null, 'email' => setting('email') ?: null,
+        'taxID' => setting('legal_inn') ?: null,
+        'address' => ['@type' => 'PostalAddress', 'addressCountry' => 'RU', 'addressLocality' => 'Краснодар',
+                      'streetAddress' => setting('address') ?: null],
+    ];
+    $same = array_values(array_filter([setting('telegram'), setting('whatsapp')]));
+    if ($same) {
+        $org['sameAs'] = $same;
+    }
+    return array_filter($org, fn($v) => $v !== null);
 }
 

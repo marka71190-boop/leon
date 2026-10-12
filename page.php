@@ -6,7 +6,13 @@ if (!$page) {
     http_response_code(404);
     $page = ['title' => 'Страница не найдена', 'content' => '<p><a href="' . url() . '">На главную</a></p>'];
 }
-page_header($page['title']);
+page_header($page['title'], [
+    'title_raw' => ($page['seo_title'] ?? '') ?: null,
+    'description' => ($page['seo_description'] ?? '') ?: seo_cut(render_content((string)$page['content'])),
+    'canonical' => isset($page['slug']) ? 'page.php?p=' . urlencode($page['slug']) : '',
+    'robots' => isset($page['slug']) ? '' : 'noindex',
+    'jsonld' => isset($page['slug']) ? [ld_breadcrumbs([['Главная', ''], [$page['title'], 'page.php?p=' . urlencode($page['slug'])]])] : [],
+]);
 ?>
 <div class="container page-pad">
   <nav class="crumbs" aria-label="Навигация"><a href="<?= url() ?>">Главная</a> / <?= e($page['title']) ?></nav>

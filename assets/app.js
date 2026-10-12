@@ -21,6 +21,34 @@
     input.addEventListener('blur', function () { set(parseInt(input.value, 10) || step); });
   });
 
+  // Галерея фото товара: клик по миниатюре меняет большое фото, стрелки ← → листают
+  document.querySelectorAll('[data-gallery]').forEach(function (g) {
+    var main = g.querySelector('[data-gallery-main]');
+    var btns = Array.prototype.slice.call(g.querySelectorAll('.thumb-btn'));
+    if (!main || btns.length < 2) return;
+    function show(i) {
+      i = (i + btns.length) % btns.length;
+      main.src = btns[i].dataset.src;
+      btns.forEach(function (b, k) { b.classList.toggle('on', k === i); if (k === i) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current'); });
+      return i;
+    }
+    var cur = 0;
+    btns.forEach(function (b, k) { b.addEventListener('click', function () { cur = show(k); }); });
+    g.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowRight') { cur = show(cur + 1); btns[cur].focus(); }
+      if (e.key === 'ArrowLeft') { cur = show(cur - 1); btns[cur].focus(); }
+    });
+    // Свайп по большому фото на телефоне
+    var x0 = null;
+    main.addEventListener('touchstart', function (e) { x0 = e.touches[0].clientX; }, { passive: true });
+    main.addEventListener('touchend', function (e) {
+      if (x0 === null) return;
+      var dx = e.changedTouches[0].clientX - x0;
+      if (Math.abs(dx) > 40) cur = show(cur + (dx < 0 ? 1 : -1));
+      x0 = null;
+    });
+  });
+
   // Автосохранение количества в корзине
   document.querySelectorAll('[data-autosubmit]').forEach(function (form) {
     var t;

@@ -1,7 +1,7 @@
 <?php
 require dirname(__DIR__) . '/inc/bootstrap.php';
 require __DIR__ . '/_layout.php';
-require_admin();
+require_admin('products');
 
 if (is_post()) {
     csrf_check();
@@ -19,11 +19,12 @@ if (is_post()) {
                 delete_upload($image);
                 $image = '';
             }
-            $vals = [post('name'), post('description'), $image, (int)post('sort'), post('active') === '1' ? 1 : 0];
+            $vals = [post('name'), post('description'), $image, (int)post('sort'), post('active') === '1' ? 1 : 0,
+                     mb_substr(post('seo_title'), 0, 120), mb_substr(post('seo_description'), 0, 300)];
             if ($old) {
-                q('UPDATE categories SET name=?, description=?, image=?, sort=?, active=? WHERE id=?', [...$vals, $id]);
+                q('UPDATE categories SET name=?, description=?, image=?, sort=?, active=?, seo_title=?, seo_description=? WHERE id=?', [...$vals, $id]);
             } else {
-                q('INSERT INTO categories (name, description, image, sort, active) VALUES (?,?,?,?,?)', $vals);
+                q('INSERT INTO categories (name, description, image, sort, active, seo_title, seo_description) VALUES (?,?,?,?,?,?,?)', $vals);
             }
             flash('Раздел сохранён.');
         }
@@ -78,6 +79,12 @@ admin_header('Разделы каталога', 'categories');
       <?= a_image('image', 'Картинка раздела', $cur['image']) ?>
     </div>
     <?= a_check('active', 'Показывать на сайте', (bool)$cur['active']) ?>
+    <details<?= ($cur['seo_title'] ?? '') !== '' || ($cur['seo_description'] ?? '') !== '' ? ' open' : '' ?>><summary style="cursor:pointer; font-weight:600">SEO раздела</summary>
+      <div class="a-grid" style="margin-top:10px">
+        <?= a_input('seo_title', 'Заголовок для поисковиков (title)', $cur['seo_title'] ?? '', 'text', 'Пусто — «Название оптом от производителя»', ['maxlength' => 120]) ?>
+        <?= a_textarea('seo_description', 'Описание для поисковиков (description)', $cur['seo_description'] ?? '', 'До 160 символов. Пусто — собирается из описания раздела', false, 2) ?>
+      </div>
+    </details>
     <div><button class="a-btn" type="submit">Сохранить</button> <a href="<?= url('admin/categories.php') ?>">Отмена</a></div>
   </form>
 </div>

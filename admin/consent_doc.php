@@ -1,6 +1,6 @@
 <?php
 require dirname(__DIR__) . '/inc/bootstrap.php';
-require_admin();
+require_admin('consents');
 
 // Документ-согласие для печати или сохранения в PDF: одна запись (?id=), все согласия клиента (?user=) или заказа (?order=)
 $get = static fn(string $k): int => is_string($_GET[$k] ?? null) ? (int)$_GET[$k] : 0;

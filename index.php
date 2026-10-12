@@ -7,7 +7,14 @@ $popular = q('SELECT p.*, c.name AS category_name FROM products p LEFT JOIN cate
               WHERE p.active = 1 AND p.popular = 1 ORDER BY p.sort, p.id LIMIT 8')->fetchAll();
 $min = min_order();
 
-page_header();
+page_header('', [
+    'canonical' => '',
+    'jsonld' => [
+        ld_organization(),
+        ['@context' => 'https://schema.org', '@type' => 'WebSite', 'name' => setting('site_name'), 'url' => abs_url(''),
+         'potentialAction' => ['@type' => 'SearchAction', 'target' => abs_url('catalog.php') . '?q={search_term_string}', 'query-input' => 'required name=search_term_string']],
+    ],
+]);
 ?>
 <section class="container hero">
   <div class="hero-text">

@@ -56,10 +56,24 @@ function accent_css(): string
     return '<style>:root{--accent:' . $c . '}</style>';
 }
 
+/**
+ * Шапка страницы. $opt: description, robots, canonical (путь как у url()), image (файл из uploads/assets),
+ * type (website|product), jsonld (массив схем schema.org), title_raw (готовый title без добавки названия сайта).
+ */
 function page_header(string $title = '', array $opt = []): void
 {
-    $siteTitle = $title ? $title . ' — ' . setting('site_name') : setting('seo_title');
-    $desc = $opt['description'] ?? setting('seo_description');
+    $siteTitle = $opt['title_raw'] ?? ($title ? $title . ' — ' . setting('site_name') : setting('seo_title'));
+    $desc = seo_cut((string)($opt['description'] ?? '') ?: setting('seo_description'), 200);
+    $robots = setting('seo_noindex') === '1' ? 'noindex, nofollow' : (string)($opt['robots'] ?? '');
+    if (array_key_exists('canonical', $opt)) {
+        $canonical = abs_url((string)$opt['canonical']);
+    } else {
+        $script = ltrim(substr((string)($_SERVER['SCRIPT_NAME'] ?? ''), strlen(BASE)), '/');
+        $canonical = abs_url($script === 'index.php' ? '' : $script);
+    }
+    $img = (string)($opt['image'] ?? '') ?: setting('seo_og_image') ?: 'assets/logo/leonpro-horizontal-for-light-bg.png';
+    $ogImage = str_starts_with($img, 'assets/') ? abs_url($img) : abs_url('uploads/' . ltrim($img, '/'));
+    $jsonld = (array)($opt['jsonld'] ?? []);
     $menuPages = q('SELECT slug, title FROM pages WHERE in_menu = 1 ORDER BY sort, id')->fetchAll();
     $cats = q('SELECT id, name FROM categories WHERE active = 1 ORDER BY sort, id')->fetchAll();
     $cartCount = cart_count();
@@ -72,8 +86,23 @@ function page_header(string $title = '', array $opt = []): void
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title><?= e($siteTitle) ?></title>
 <meta name="description" content="<?= e($desc) ?>">
-<?php if (!empty($opt['robots'])): ?><meta name="robots" content="<?= e($opt['robots']) ?>"><?php endif; ?>
+<?php if ($robots !== ''): ?><meta name="robots" content="<?= e($robots) ?>"><?php endif; ?>
+<link rel="canonical" href="<?= e($canonical) ?>">
+<meta property="og:type" content="<?= e($opt['type'] ?? 'website') ?>">
+<meta property="og:site_name" content="<?= e(setting('site_name')) ?>">
+<meta property="og:locale" content="ru_RU">
+<meta property="og:title" content="<?= e($siteTitle) ?>">
+<meta property="og:description" content="<?= e($desc) ?>">
+<meta property="og:url" content="<?= e($canonical) ?>">
+<meta property="og:image" content="<?= e($ogImage) ?>">
+<meta name="twitter:card" content="summary_large_image">
+<?php if (setting('yandex_verification') !== ''): ?><meta name="yandex-verification" content="<?= e(setting('yandex_verification')) ?>"><?php endif; ?>
+<?php if (setting('google_verification') !== ''): ?><meta name="google-site-verification" content="<?= e(setting('google_verification')) ?>"><?php endif; ?>
 <link rel="icon" href="<?= url('assets/favicon.svg') ?>" type="image/svg+xml">
+<link rel="apple-touch-icon" href="<?= url('assets/logo/leonpro-mark-for-light-bg.png') ?>">
+<?php foreach ($jsonld as $ld): ?>
+<script type="application/ld+json"><?= json_encode($ld, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) ?></script>
+<?php endforeach; ?>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700&family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">

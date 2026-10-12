@@ -1,7 +1,7 @@
 <?php
 require dirname(__DIR__) . '/inc/bootstrap.php';
 require __DIR__ . '/_layout.php';
-require_admin();
+require_admin('pages');
 
 $system = ['oferta', 'privacy', 'delivery']; // на них ссылается сайт — удалять нельзя
 
@@ -25,11 +25,12 @@ if (is_post()) {
             flash('Страница с таким адресом уже есть.', 'error');
             back('admin/pages.php');
         }
-        $vals = [$slug, $title, (string)($_POST['content'] ?? ''), post('in_menu') === '1' ? 1 : 0, (int)post('sort')];
+        $vals = [$slug, $title, (string)($_POST['content'] ?? ''), post('in_menu') === '1' ? 1 : 0, (int)post('sort'),
+                 mb_substr(post('seo_title'), 0, 120), mb_substr(post('seo_description'), 0, 300)];
         if ($old) {
-            q('UPDATE pages SET slug=?, title=?, content=?, in_menu=?, sort=? WHERE id=?', [...$vals, $id]);
+            q('UPDATE pages SET slug=?, title=?, content=?, in_menu=?, sort=?, seo_title=?, seo_description=? WHERE id=?', [...$vals, $id]);
         } else {
-            q('INSERT INTO pages (slug, title, content, in_menu, sort) VALUES (?,?,?,?,?)', $vals);
+            q('INSERT INTO pages (slug, title, content, in_menu, sort, seo_title, seo_description) VALUES (?,?,?,?,?,?,?)', $vals);
             $id = (int)db()->lastInsertId();
         }
         flash('Страница сохранена.');
@@ -45,7 +46,7 @@ if (is_post()) {
 if (isset($_GET['edit'])) {
     $id = (int)$_GET['edit'];
     $p = $id ? q('SELECT * FROM pages WHERE id = ?', [$id])->fetch() : null;
-    $p = $p ?: ['id' => 0, 'slug' => '', 'title' => '', 'content' => '', 'in_menu' => 1, 'sort' => 10];
+    $p = $p ?: ['id' => 0, 'slug' => '', 'title' => '', 'content' => '', 'in_menu' => 1, 'sort' => 10, 'seo_title' => '', 'seo_description' => ''];
     $isSystem = in_array($p['slug'], $system, true);
     admin_header($p['id'] ? 'Страница' : 'Новая страница', 'pages', true);
     ?>
@@ -60,6 +61,13 @@ if (isset($_GET['edit'])) {
         </div>
         <?= a_check('in_menu', 'Показывать в верхнем меню', (bool)$p['in_menu']) ?>
         <?= a_textarea('content', 'Текст страницы', $p['content'], 'Метки, которые сайт заменит сам: {{реквизиты}} — реквизиты с банком, {{оператор}} — реквизиты без банка, {{продавец}} — название ИП, {{телефон}} — телефон', true, 16) ?>
+      </div>
+      <div class="a-card">
+        <h2>SEO страницы</h2>
+        <div class="a-grid">
+          <?= a_input('seo_title', 'Заголовок для поисковиков (title)', $p['seo_title'], 'text', 'Пусто — «Заголовок — ' . e(setting('site_name')) . '»', ['maxlength' => 120]) ?>
+          <?= a_textarea('seo_description', 'Описание для поисковиков (description)', $p['seo_description'], 'До 160 символов. Пусто — начало текста страницы', false, 2) ?>
+        </div>
       </div>
       <div class="a-save"><button class="a-btn" type="submit">Сохранить страницу</button></div>
     </form>

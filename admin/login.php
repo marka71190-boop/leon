@@ -21,9 +21,10 @@ if (is_post()) {
         } elseif ($pass !== (string)($_POST['password2'] ?? '')) {
             $error = 'Пароли не совпадают.';
         } else {
-            q('INSERT INTO admins (login, password_hash) VALUES (?, ?)', [$login, password_hash($pass, PASSWORD_DEFAULT)]);
+            q('INSERT INTO admins (login, password_hash, is_owner, last_login) VALUES (?, ?, 1, ?)', [$login, password_hash($pass, PASSWORD_DEFAULT), date('Y-m-d H:i:s')]);
             session_regen();
             $_SESSION['admin_id'] = (int)db()->lastInsertId();
+            admin_log_action(current_admin(), 'setup');
             flash('Администратор создан. Начните с раздела «Настройки сайта»: телефон, email, адрес.');
             redirect('admin/settings.php');
         }
@@ -36,6 +37,8 @@ if (is_post()) {
             session_regen();
             $_SESSION['admin_id'] = (int)$a['id'];
             $_SESSION['admin_fails'] = 0;
+            q('UPDATE admins SET last_login = ? WHERE id = ?', [date('Y-m-d H:i:s'), $a['id']]);
+            admin_log_action($a, 'login');
             redirect('admin/index.php');
         }
         $_SESSION['admin_fails']++;

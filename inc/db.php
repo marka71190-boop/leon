@@ -122,6 +122,39 @@ SQL);
         $pdo->exec("UPDATE pages SET content = REPLACE(content, '{{реквизиты}}', '{{оператор}}') WHERE slug = 'privacy'");
         $pdo->exec("INSERT INTO settings (key, value) VALUES ('db_version', '6') ON CONFLICT(key) DO UPDATE SET value = '6'");
     }
+    if ($v < 7) {
+        $addCol = static function (string $table, string $col, string $def) use ($pdo): void {
+            $cols = array_column($pdo->query("PRAGMA table_info($table)")->fetchAll(), 'name');
+            if (!in_array($col, $cols, true)) {
+                $pdo->exec("ALTER TABLE $table ADD COLUMN $col $def");
+            }
+        };
+        // Права администраторов: главный администратор и разделы для остальных
+        $addCol('admins', 'is_owner', 'INTEGER DEFAULT 0');
+        $addCol('admins', 'perms', "TEXT DEFAULT ''");
+        $addCol('admins', 'name', "TEXT DEFAULT ''");
+        $addCol('admins', 'last_login', 'TEXT');
+        // Все, кто уже был администратором, сохраняют полный доступ
+        $pdo->exec('UPDATE admins SET is_owner = 1');
+        $pdo->exec(<<<SQL
+CREATE TABLE IF NOT EXISTS admin_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, created_at TEXT NOT NULL, admin_id INTEGER, login TEXT DEFAULT '',
+  page TEXT DEFAULT '', action TEXT DEFAULT '', target TEXT DEFAULT '', ip TEXT DEFAULT '');
+CREATE INDEX IF NOT EXISTS admin_log_created ON admin_log(created_at);
+CREATE TABLE IF NOT EXISTS product_images (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, product_id INTEGER NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  file TEXT NOT NULL, sort INTEGER DEFAULT 0);
+CREATE INDEX IF NOT EXISTS product_images_product ON product_images(product_id);
+SQL);
+        // Уже загруженное фото товара становится первым (главным) в галерее
+        $pdo->exec("INSERT INTO product_images (product_id, file, sort) SELECT id, image, 0 FROM products WHERE COALESCE(image, '') <> ''");
+        // SEO-поля у товаров, разделов и страниц
+        foreach (['products', 'categories', 'pages'] as $t) {
+            $addCol($t, 'seo_title', "TEXT DEFAULT ''");
+            $addCol($t, 'seo_description', "TEXT DEFAULT ''");
+        }
+        $pdo->exec("INSERT INTO settings (key, value) VALUES ('db_version', '7') ON CONFLICT(key) DO UPDATE SET value = '7'");
+    }
 }
 
 function table_exists(PDO $pdo, string $name): bool

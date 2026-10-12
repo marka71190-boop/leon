@@ -1,7 +1,7 @@
 <?php
 require dirname(__DIR__) . '/inc/bootstrap.php';
 require __DIR__ . '/_layout.php';
-$admin = require_admin();
+$admin = require_admin('orders');
 
 $statuses = order_statuses();
 $steps = order_steps();

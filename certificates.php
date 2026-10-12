@@ -5,7 +5,7 @@ $general = q('SELECT * FROM documents WHERE product_id IS NULL ORDER BY sort, id
 $byProduct = q('SELECT d.*, p.name AS pname, p.size AS psize FROM documents d JOIN products p ON p.id = d.product_id
                 WHERE p.active = 1 ORDER BY p.sort, p.id, d.sort, d.id')->fetchAll();
 
-page_header('Сертификаты');
+page_header('Сертификаты', ['description' => 'Сертификаты, свидетельства и паспорта качества на продукцию ' . setting('site_name') . ': тарельчатые дюбели, площадки под стяжку, якорные скобы и СВП.']);
 ?>
 <div class="container page-pad">
   <nav class="crumbs" aria-label="Навигация"><a href="<?= url() ?>">Главная</a> / Сертификаты</nav>

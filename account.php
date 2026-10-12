@@ -55,7 +55,7 @@ $active = array_values(array_filter($orders, fn($o) => !in_array($o['status'], [
 $stages = array_map(fn($s) => $s[1], order_steps());
 $stageKeys = array_keys($stages);
 
-page_header('Личный кабинет');
+page_header('Личный кабинет', ['robots' => 'noindex, nofollow']);
 ?>
 <div class="container page-pad">
   <h1 style="margin-top:28px">Личный кабинет</h1>

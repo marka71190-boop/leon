@@ -56,7 +56,7 @@ if (is_post()) {
     }
 }
 
-page_header($mode === 'register' ? 'Регистрация' : 'Вход');
+page_header($mode === 'register' ? 'Регистрация' : 'Вход', ['robots' => 'noindex, follow', 'canonical' => 'login.php']);
 $qs = $backTo === 'cart.php' ? '&back=cart' : '';
 ?>
 <div class="container page-pad">

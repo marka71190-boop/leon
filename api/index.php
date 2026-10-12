@@ -3,6 +3,8 @@
 $path = '/' . trim((string)parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
 if ($path === '/') $path = '/index.php';
 if ($path === '/admin') $path = '/admin/index.php';
+if ($path === '/sitemap.xml') $path = '/sitemap.php';
+if ($path === '/robots.txt') $path = '/robots.php';
 
 // Загруженные в демо файлы живут во временной папке
 if (str_starts_with($path, '/uploads/')) {

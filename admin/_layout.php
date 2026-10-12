@@ -4,19 +4,28 @@ declare(strict_types=1);
 function admin_header(string $title, string $active = '', bool $editor = false): void
 {
     $admin = current_admin();
-    $newOrders = (int)q("SELECT COUNT(*) FROM orders WHERE status = 'new'")->fetchColumn();
-    $menu = [
-        'index'      => ['Обзор', 'admin/index.php'],
-        'orders'     => ['Заказы' . ($newOrders ? ' <b class="nbadge">' . $newOrders . '</b>' : ''), 'admin/orders.php'],
-        'products'   => ['Товары', 'admin/products.php'],
-        'categories' => ['Разделы каталога', 'admin/categories.php'],
-        'documents'  => ['Документы', 'admin/documents.php'],
-        'pages'      => ['Страницы', 'admin/pages.php'],
-        'clients'    => ['Клиенты', 'admin/clients.php'],
-        'consents'   => ['Согласия', 'admin/consents.php'],
-        'settings'   => ['Настройки сайта', 'admin/settings.php'],
-        'admins'     => ['Администраторы', 'admin/admins.php'],
+    $newOrders = admin_can($admin, 'orders') ? (int)q("SELECT COUNT(*) FROM orders WHERE status = 'new'")->fetchColumn() : 0;
+    $isOwner = admin_can($admin, 'owner');
+    // Пункт меню => [название, ссылка, нужный доступ]
+    $all = [
+        'index'      => ['Обзор', 'admin/index.php', ''],
+        'orders'     => ['Заказы' . ($newOrders ? ' <b class="nbadge">' . $newOrders . '</b>' : ''), 'admin/orders.php', 'orders'],
+        'products'   => ['Товары', 'admin/products.php', 'products'],
+        'categories' => ['Разделы каталога', 'admin/categories.php', 'products'],
+        'documents'  => ['Документы', 'admin/documents.php', 'products'],
+        'pages'      => ['Страницы', 'admin/pages.php', 'pages'],
+        'clients'    => ['Клиенты', 'admin/clients.php', 'clients'],
+        'consents'   => ['Согласия', 'admin/consents.php', 'consents'],
+        'settings'   => ['Настройки сайта', 'admin/settings.php', 'settings'],
+        'admins'     => [$isOwner ? 'Администраторы' : 'Мой пароль', 'admin/admins.php', ''],
+        'log'        => ['Журнал действий', 'admin/log.php', 'owner'],
     ];
+    $menu = [];
+    foreach ($all as $k => [$label, $href, $perm]) {
+        if ($perm === '' || admin_can($admin, $perm)) {
+            $menu[$k] = [$label, $href];
+        }
+    }
     ?>
 <!doctype html>
 <html lang="ru">
@@ -44,7 +53,7 @@ function admin_header(string $title, string $active = '', bool $editor = false):
     </nav>
     <div class="a-side-foot">
       <a href="<?= url() ?>" target="_blank">Открыть сайт ↗</a>
-      <span><?= e($admin['login']) ?></span>
+      <span><?= e($admin['name'] ?: $admin['login']) ?><?= $isOwner ? ' · главный' : '' ?></span>
       <form method="post" action="<?= url('admin/logout.php') ?>"><?= csrf_field() ?><button type="submit">Выйти</button></form>
     </div>
   </aside>

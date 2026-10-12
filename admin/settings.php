@@ -1,7 +1,7 @@
 <?php
 require dirname(__DIR__) . '/inc/bootstrap.php';
 require __DIR__ . '/_layout.php';
-require_admin();
+require_admin('settings');
 
 $schema = settings_schema();
 

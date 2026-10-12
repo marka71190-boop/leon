@@ -13,7 +13,7 @@ if ($order && !$mine && !($user && (int)$order['user_id'] === (int)$user['id']))
 }
 
 if (!$order) {
-    page_header('Заказ не найден');
+    page_header('Заказ не найден', ['robots' => 'noindex']);
     ?>
     <div class="container page-pad">
       <h1 style="margin-top:28px">Заказ не найден</h1>

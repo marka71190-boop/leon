@@ -5,7 +5,7 @@ $id = (int)($_GET['id'] ?? 0);
 $p = q('SELECT p.*, c.name AS category_name FROM products p LEFT JOIN categories c ON c.id = p.category_id WHERE p.id = ? AND p.active = 1', [$id])->fetch();
 if (!$p) {
     http_response_code(404);
-    page_header('Товар не найден');
+    page_header('Товар не найден', ['robots' => 'noindex']);
     echo '<div class="container page-pad"><h1 style="margin-top:32px">Товар не найден</h1><p><a href="' . url('catalog.php') . '">Вернуться в каталог</a></p></div>';
     page_footer();
     exit;
@@ -14,6 +14,8 @@ $docs = q('SELECT * FROM documents WHERE product_id = ? ORDER BY sort, id', [$id
 $related = q('SELECT * FROM products WHERE category_id IS ? AND id <> ? AND active = 1 ORDER BY sort, id LIMIT 4', [$p['category_id'], $id])->fetchAll();
 $step = product_step($p);
 $pack = product_pack($p);
+$fullName = trim($p['name'] . ' ' . $p['size']);
+$photos = array_column(product_images($id), 'file') ?: ($p['image'] ? [$p['image']] : []);
 $cart = cart_raw();
 $inCart = isset($cart[$id]);
 // Сколько показать в поле: уже в корзине или столько, чтобы набрать минимальный заказ
@@ -33,15 +35,52 @@ foreach (preg_split('~\R~u', (string)$p['specs']) as $line) {
     }
 }
 
-page_header($p['name'] . ($p['size'] ? ' ' . $p['size'] : ''), ['description' => mb_substr(strip_tags($p['description']) ?: $p['name'], 0, 160)]);
+// SEO: заголовок и описание из админки или собираются автоматически
+$priceNum = (float)$p['price'];
+$autoDesc = $fullName . ' оптом от производителя ' . setting('site_name')
+    . ($priceNum > 0 && setting('show_prices') === '1' ? ': ' . fmt_money($priceNum) . ' за шт.' : '')
+    . ($pack ? ', в упаковке ' . fmt_qty($pack) . ' шт.' : '')
+    . '. Заказ от ' . fmt_qty(min_order()) . ' шт., отгрузка со склада в Краснодаре, доставка транспортными компаниями.';
+$ldProduct = array_filter([
+    '@context' => 'https://schema.org', '@type' => 'Product',
+    'name' => $fullName, 'sku' => $p['sku'] ?: null, 'category' => $p['category_name'] ?: null,
+    'description' => seo_cut($p['description'] ?: $autoDesc, 500),
+    'image' => $photos ? array_map(fn($f) => str_starts_with($f, 'assets/') ? abs_url($f) : abs_url('uploads/' . $f), $photos) : null,
+    'brand' => ['@type' => 'Brand', 'name' => 'LEONPRO'],
+    'offers' => $priceNum > 0 && setting('show_prices') === '1' ? [
+        '@type' => 'Offer', 'url' => abs_url('product.php?id=' . $id), 'priceCurrency' => 'RUB', 'price' => round($priceNum, 2),
+        'availability' => 'https://schema.org/InStock', 'eligibleQuantity' => ['@type' => 'QuantitativeValue', 'minValue' => min_order(), 'unitCode' => 'H87'],
+        'seller' => ['@type' => 'Organization', 'name' => setting('legal_name') ?: setting('site_name')],
+    ] : null,
+], fn($v) => $v !== null);
+$crumbs = [['Главная', ''], ['Каталог', 'catalog.php']];
+if ($p['category_id']) $crumbs[] = [$p['category_name'], 'catalog.php?cat=' . $p['category_id']];
+$crumbs[] = [$fullName, 'product.php?id=' . $id];
+page_header($fullName, [
+    'title_raw' => $p['seo_title'] ?: $fullName . ' оптом от производителя — ' . setting('site_name'),
+    'description' => $p['seo_description'] ?: ($p['description'] ? seo_cut($p['description']) : $autoDesc),
+    'canonical' => 'product.php?id=' . $id,
+    'image' => $photos[0] ?? '',
+    'type' => 'product',
+    'jsonld' => [$ldProduct, ld_breadcrumbs($crumbs)],
+]);
 ?>
 <div class="container page-pad">
   <nav class="crumbs" aria-label="Навигация"><a href="<?= url() ?>">Главная</a> / <a href="<?= url('catalog.php') ?>">Каталог</a><?php if ($p['category_id']): ?> / <a href="<?= url('catalog.php?cat=' . $p['category_id']) ?>"><?= e($p['category_name']) ?></a><?php endif; ?></nav>
 
   <div class="product">
-    <div class="product-gallery">
-      <?php if ($p['image']): ?>
-        <img class="main-img" src="<?= e(upload_url($p['image'])) ?>" alt="<?= e($p['name']) ?>">
+    <div class="product-gallery" data-gallery>
+      <?php if ($photos): ?>
+        <img class="main-img" src="<?= e(upload_url($photos[0])) ?>" alt="<?= e($fullName) ?>" data-gallery-main>
+        <?php if (count($photos) > 1): ?>
+          <div class="thumbs" role="list" aria-label="Фото товара">
+            <?php foreach ($photos as $i => $ph): ?>
+              <button type="button" role="listitem" class="thumb-btn<?= $i === 0 ? ' on' : '' ?>" data-src="<?= e(upload_url($ph)) ?>" aria-label="Фото <?= $i + 1 ?> из <?= count($photos) ?>"<?= $i === 0 ? ' aria-current="true"' : '' ?>>
+                <img src="<?= e(upload_url($ph)) ?>" alt="" loading="lazy">
+              </button>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
       <?php else: ?>
         <div class="main-img"><span style="opacity:.25"><?= logo_mark(160) ?></span></div>
       <?php endif; ?>

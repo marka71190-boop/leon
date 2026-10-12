@@ -1,7 +1,7 @@
 <?php
 require dirname(__DIR__) . '/inc/bootstrap.php';
 require __DIR__ . '/_layout.php';
-require_admin();
+require_admin('products');
 
 $cats = q('SELECT * FROM categories ORDER BY sort, id')->fetchAll();
 
@@ -31,16 +31,11 @@ if (is_post()) {
                 'popular'     => post('popular') === '1' ? 1 : 0,
                 'active'      => post('active') === '1' ? 1 : 0,
                 'sort'        => (int)post('sort'),
+                'seo_title'   => mb_substr(post('seo_title'), 0, 120),
+                'seo_description' => mb_substr(post('seo_description'), 0, 300),
             ];
             $old = $id ? q('SELECT * FROM products WHERE id = ?', [$id])->fetch() : null;
-            $img = handle_upload('image', ['jpg', 'png', 'webp'], 'products');
-            if ($img) {
-                $data['image'] = $img;
-                if ($old) delete_upload($old['image']);
-            } elseif ($old && post('image_remove') === '1') {
-                delete_upload($old['image']);
-                $data['image'] = '';
-            }
+            $newImages = handle_uploads('images', ['jpg', 'png', 'webp'], 'products');
             if ($old) {
                 $set = implode(', ', array_map(fn($k) => "$k = ?", array_keys($data)));
                 q("UPDATE products SET $set WHERE id = ?", [...array_values($data), $id]);
@@ -49,13 +44,49 @@ if (is_post()) {
                 q("INSERT INTO products ($cols) VALUES (" . implode(',', array_fill(0, count($data), '?')) . ')', array_values($data));
                 $id = (int)db()->lastInsertId();
             }
+            // Новые фото добавляются в конец галереи; первое фото — главное
+            if ($newImages) {
+                $sort = (int)q('SELECT COALESCE(MAX(sort), -1) FROM product_images WHERE product_id = ?', [$id])->fetchColumn();
+                foreach ($newImages as $file) {
+                    q('INSERT INTO product_images (product_id, file, sort) VALUES (?,?,?)', [$id, $file, ++$sort]);
+                }
+                product_sync_cover($id);
+            }
             // Документы товара
             $doc = handle_upload('doc_file', ['pdf', 'jpg', 'png'], 'docs');
             if ($doc) {
                 q('INSERT INTO documents (title, file, product_id) VALUES (?,?,?)', [post('doc_title') ?: 'Документ', $doc, $id]);
             }
-            flash('Товар сохранён.');
-            redirect('admin/products.php?edit=' . $id);
+            flash('Товар сохранён.' . ($newImages ? ' Добавлено фото: ' . count($newImages) . '.' : ''));
+            redirect('admin/products.php?edit=' . $id . ($newImages ? '#photos' : ''));
+        }
+        // Фото: удалить, сделать главным, переставить
+        if (in_array($action, ['img_delete', 'img_main', 'img_move'], true) && $id) {
+            $imgs = product_images($id);
+            $imgId = (int)post('img_id');
+            $ids = array_map(fn($i) => (int)$i['id'], $imgs);
+            $pos = array_search($imgId, $ids, true);
+            if ($pos !== false) {
+                if ($action === 'img_delete') {
+                    delete_upload($imgs[$pos]['file']);
+                    q('DELETE FROM product_images WHERE id = ?', [$imgId]);
+                    array_splice($ids, $pos, 1);
+                } elseif ($action === 'img_main') {
+                    array_splice($ids, $pos, 1);
+                    array_unshift($ids, $imgId);
+                } else {
+                    $to = $pos + (post('dir') === 'left' ? -1 : 1);
+                    if (isset($ids[$to])) {
+                        [$ids[$pos], $ids[$to]] = [$ids[$to], $ids[$pos]];
+                    }
+                }
+                foreach ($ids as $i => $iid) {
+                    q('UPDATE product_images SET sort = ? WHERE id = ?', [$i, $iid]);
+                }
+                product_sync_cover($id);
+            }
+            flash($action === 'img_delete' ? 'Фото удалено.' : ($action === 'img_main' ? 'Главное фото выбрано — оно показывается в каталоге.' : 'Порядок фото изменён.'));
+            redirect('admin/products.php?edit=' . $id . '#photos');
         }
         if ($action === 'copy' && $id) {
             $p = q('SELECT * FROM products WHERE id = ?', [$id])->fetch();
@@ -75,7 +106,9 @@ if (is_post()) {
         if ($action === 'delete' && $id) {
             $p = q('SELECT * FROM products WHERE id = ?', [$id])->fetch();
             foreach (q('SELECT file FROM documents WHERE product_id = ?', [$id])->fetchAll(PDO::FETCH_COLUMN) as $f) delete_upload($f);
-            delete_upload($p['image'] ?? '');
+            foreach (product_images($id) as $im) delete_upload($im['file']);
+            q('DELETE FROM product_images WHERE product_id = ?', [$id]);
+            if ($p && $p['image'] && !q('SELECT 1 FROM product_images WHERE file = ?', [$p['image']])->fetchColumn()) delete_upload($p['image']);
             q('DELETE FROM products WHERE id = ?', [$id]);
             flash('Товар удалён.');
             redirect('admin/products.php');
@@ -111,7 +144,9 @@ if (isset($_GET['edit'])) {
     $p = $id ? q('SELECT * FROM products WHERE id = ?', [$id])->fetch() : null;
     if ($id && !$p) redirect('admin/products.php');
     $p = $p ?: ['id' => 0, 'category_id' => (int)($_GET['cat'] ?? 0), 'name' => '', 'sku' => '', 'size' => '', 'material' => '', 'type' => '',
-                'pack_qty' => 0, 'price' => 0, 'step' => 0, 'description' => '', 'specs' => '', 'image' => '', 'popular' => 0, 'active' => 1, 'sort' => 0];
+                'pack_qty' => 0, 'price' => 0, 'step' => 0, 'description' => '', 'specs' => '', 'image' => '', 'popular' => 0, 'active' => 1, 'sort' => 0,
+                'seo_title' => '', 'seo_description' => ''];
+    $images = $id ? product_images($id) : [];
     $docs = $id ? q('SELECT * FROM documents WHERE product_id = ? ORDER BY sort, id', [$id])->fetchAll() : [];
     admin_header($id ? 'Товар' : 'Новый товар', 'products', true);
     ?>
@@ -144,9 +179,26 @@ if (isset($_GET['edit'])) {
           <?= a_textarea('description', 'Описание товара', $p['description'], '', true) ?>
         </div>
       </div>
-      <div class="a-card">
-        <h2>Фото</h2>
-        <?= a_image('image', 'Фото товара', $p['image'], 'JPG, PNG или WEBP, лучше квадратное от 800×800') ?>
+      <div class="a-card" id="photos">
+        <h2>Фото <span class="a-muted" style="font-weight:400; font-size:14px"><?= $images ? count($images) . ' шт.' : '' ?></span></h2>
+        <?php if ($images): ?>
+          <div class="a-photos">
+            <?php foreach ($images as $i => $im): ?>
+              <div class="a-photo<?= $i === 0 ? ' is-main' : '' ?>">
+                <img src="<?= e(upload_url($im['file'])) ?>" alt="Фото <?= $i + 1 ?>" loading="lazy">
+                <div class="a-photo-bar">
+                  <?php if ($i === 0): ?><span class="a-photo-main">Главное</span><?php else: ?><button type="submit" form="img-main-<?= $im['id'] ?>" title="Сделать главным">★ Главное</button><?php endif; ?>
+                  <?php if ($i > 0): ?><button type="submit" form="img-left-<?= $im['id'] ?>" aria-label="Левее">←</button><?php endif; ?>
+                  <?php if ($i < count($images) - 1): ?><button type="submit" form="img-right-<?= $im['id'] ?>" aria-label="Правее">→</button><?php endif; ?>
+                  <button type="submit" class="del" form="img-del-<?= $im['id'] ?>" aria-label="Удалить фото">✕</button>
+                </div>
+              </div>
+            <?php endforeach; ?>
+          </div>
+        <?php endif; ?>
+        <label class="a-field"><span><?= $images ? 'Добавить ещё фото' : 'Фото товара' ?></span>
+          <input type="file" name="images[]" multiple accept=".jpg,.jpeg,.png,.webp">
+          <small>Можно выбрать сразу несколько файлов (до 25 МБ за один раз). JPG, PNG или WEBP, лучше квадратные от 800×800. Первое фото — главное: оно в каталоге и в карточке. Загрузятся при сохранении товара.</small></label>
       </div>
       <div class="a-card">
         <h2>Документы товара</h2>
@@ -163,6 +215,14 @@ if (isset($_GET['edit'])) {
         </div>
       </div>
       <div class="a-card">
+        <h2>SEO</h2>
+        <p class="a-muted" style="margin-top:-6px">Можно не заполнять — сайт составит заголовок и описание сам из названия, размера, цены и фасовки.</p>
+        <div class="a-grid">
+          <?= a_input('seo_title', 'Заголовок для поисковиков (title)', $p['seo_title'], 'text', 'До 60–70 символов. Пусто — «' . e(trim($p['name'] . ' ' . $p['size'])) . ' оптом от производителя»', ['maxlength' => 120]) ?>
+          <?= a_textarea('seo_description', 'Описание для поисковиков (description)', $p['seo_description'], 'До 160 символов. Показывается под ссылкой в Яндексе и Google', false, 2) ?>
+        </div>
+      </div>
+      <div class="a-card">
         <h2>Показ на сайте</h2>
         <div class="a-grid">
           <div><?= a_check('active', 'Показывать на сайте', (bool)$p['active']) ?><?= a_check('popular', 'Показывать в «Ходовых позициях» на главной', (bool)$p['popular']) ?></div>
@@ -171,6 +231,12 @@ if (isset($_GET['edit'])) {
       </div>
       <div class="a-save"><button class="a-btn" type="submit">Сохранить товар</button><a class="a-btn a-btn-out" href="<?= url('admin/products.php') ?>">Отмена</a></div>
     </form>
+ <?php foreach ($images as $im): ?>
+      <form id="img-main-<?= $im['id'] ?>" method="post" hidden><?= csrf_field() ?><input type="hidden" name="action" value="img_main"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="img_id" value="<?= $im['id'] ?>"></form>
+      <form id="img-left-<?= $im['id'] ?>" method="post" hidden><?= csrf_field() ?><input type="hidden" name="action" value="img_move"><input type="hidden" name="dir" value="left"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="img_id" value="<?= $im['id'] ?>"></form>
+      <form id="img-right-<?= $im['id'] ?>" method="post" hidden><?= csrf_field() ?><input type="hidden" name="action" value="img_move"><input type="hidden" name="dir" value="right"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="img_id" value="<?= $im['id'] ?>"></form>
+      <form id="img-del-<?= $im['id'] ?>" method="post" data-confirm="Удалить это фото?" hidden><?= csrf_field() ?><input type="hidden" name="action" value="img_delete"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="img_id" value="<?= $im['id'] ?>"></form>
+    <?php endforeach; ?>
     <?php foreach ($docs as $d): ?>
       <form id="docdel-<?= $d['id'] ?>" method="post" data-confirm="Удалить документ?"><?= csrf_field() ?><input type="hidden" name="action" value="doc_delete"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="doc_id" value="<?= $d['id'] ?>"></form>
     <?php endforeach; ?>

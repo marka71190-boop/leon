@@ -3,6 +3,13 @@ DirectoryIndex index.php
 Options -Indexes
 AddDefaultCharset UTF-8
 
+# Карта сайта и правила для поисковиков формируются автоматически
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^sitemap\.xml$ sitemap.php [L]
+  RewriteRule ^robots\.txt$ robots.php [L]
+</IfModule>
+
 # Закрываем служебные файлы
 <FilesMatch "(^\.|\.(md|sqlite|log|lock|json|sh)$)">
   <IfModule mod_authz_core.c>

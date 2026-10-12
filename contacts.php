@@ -1,7 +1,7 @@
 <?php
 require __DIR__ . '/inc/bootstrap.php';
 
-page_header('Контакты');
+page_header('Контакты', ['description' => 'Контакты ' . setting('site_name') . ': телефон ' . setting('phone') . ', ' . setting('address') . '. Оптовые поставки крепежа со склада в Краснодаре.']);
 $tel = preg_replace('~[^\d+]~', '', setting('phone'));
 ?>
 <div class="container page-pad">

@@ -58,7 +58,25 @@ $cart = cart_raw();
 $min = min_order();
 $inCart = cart_total_qty();
 
-page_header($curCat['name'] ?? 'Каталог');
+// SEO: у раздела свой заголовок и описание; страницы поиска и фильтров не индексируются
+$filtered = $search !== '' || $selSizes || $selTypes || $sort !== '';
+$crumbs = [['Главная', ''], ['Каталог', 'catalog.php']];
+if ($curCat) {
+    $crumbs[] = [$curCat['name'], 'catalog.php?cat=' . $curCat['id']];
+    $seoTitle = $curCat['seo_title'] ?: $curCat['name'] . ' оптом от производителя — ' . setting('site_name');
+    $seoDesc = $curCat['seo_description'] ?: ($curCat['description'] ? rtrim($curCat['description'], '. ') . '. ' : '') . $curCat['name'] . ' оптом от производителя ' . setting('site_name') . ': заказ от ' . fmt_qty(min_order()) . ' шт., отгрузка со склада в Краснодаре, доставка по России.';
+} else {
+    $seoTitle = 'Каталог: тарельчатые дюбели, площадки под стяжку, якорные скобы и СВП оптом — ' . setting('site_name');
+    $seoDesc = 'Каталог крепежа для теплоизоляции и стяжки от производителя ' . setting('site_name') . '. Оптовые цены, заказ от ' . fmt_qty(min_order()) . ' шт., склад в Краснодаре.';
+}
+page_header($curCat['name'] ?? 'Каталог', [
+    'title_raw' => $seoTitle,
+    'description' => $seoDesc,
+    'canonical' => $curCat ? 'catalog.php?cat=' . $curCat['id'] : 'catalog.php',
+    'robots' => $filtered ? 'noindex, follow' : '',
+    'image' => $curCat['image'] ?? '',
+    'jsonld' => [ld_breadcrumbs($crumbs)],
+]);
 ?>
 <div class="container page-pad">
   <nav class="crumbs" aria-label="Навигация"><a href="<?= url() ?>">Главная</a> / <?php if ($curCat): ?><a href="<?= url('catalog.php') ?>">Каталог</a> / <?= e($curCat['name']) ?><?php else: ?>Каталог<?php endif; ?></nav>
