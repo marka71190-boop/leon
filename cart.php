@@ -147,6 +147,7 @@ page_header('Корзина', ['robots' => 'noindex, follow']);
   <?php endif; ?>
   <div class="cart-layout">
     <div class="cart-main">
+      <?php if ($min > 0): ?>
       <div class="progress-box">
         <div class="section-head" style="margin:0; font-size:15px">
           <b>В корзине <?= fmt_qty($total) ?> шт. из минимальных <?= fmt_qty($min) ?></b>
@@ -154,6 +155,7 @@ page_header('Корзина', ['robots' => 'noindex, follow']);
         </div>
         <div class="progress"><div style="width: <?= $min ? min(100, round($total / $min * 100)) : 100 ?>%"></div></div>
       </div>
+      <?php endif; ?>
 
       <form method="post" action="<?= url('cart.php') ?>" data-autosubmit>
         <?= csrf_field() ?><input type="hidden" name="action" value="update">

@@ -26,7 +26,7 @@ page_header('', [
       <a class="btn btn-outline btn-lg" href="#order">Как оформить заказ</a>
     </div>
     <div class="facts">
-      <div class="fact"><b>от <?= fmt_qty($min) ?> шт.</b><span>минимальный заказ</span></div>
+      <?php if ($min > 0): ?><div class="fact"><b>от <?= fmt_qty($min) ?> шт.</b><span>минимальный заказ</span></div><?php endif; ?>
       <div class="fact"><b>Своё производство</b><span>и склад в Краснодаре</span></div>
       <div class="fact"><b>Документы</b><span>сертификаты и паспорта качества</span></div>
     </div>
@@ -89,7 +89,7 @@ page_header('', [
   <h2 style="margin-bottom:8px">Как проходит заказ</h2>
   <p class="muted" style="margin:0 0 28px">Онлайн-оплаты нет: стоимость и доставку менеджер согласует с вами после заявки.</p>
   <ol class="steps">
-    <li><span class="n">1</span><b>Соберите корзину</b><span>Выберите позиции и укажите количество. Минимальный заказ — <?= fmt_qty($min) ?> шт.</span></li>
+    <li><span class="n">1</span><b>Соберите корзину</b><span>Выберите позиции и укажите количество.<?= $min > 0 ? ' Минимальный заказ — ' . fmt_qty($min) . ' шт.' : '' ?></span></li>
     <li><span class="n">2</span><b>Оформите заявку</b><span>Название компании, ИНН, контактное лицо и город доставки.</span></li>
     <li><span class="n">3</span><b>Согласование</b><span>Менеджер свяжется, подтвердит состав, стоимость и транспортную компанию.</span></li>
     <li><span class="n">4</span><b>Отгрузка</b><span><?= e(setting('delivery_note')) ?></span></li>

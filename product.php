@@ -40,18 +40,19 @@ $priceNum = (float)$p['price'];
 $autoDesc = $fullName . ' оптом от производителя ' . setting('site_name')
     . ($priceNum > 0 && setting('show_prices') === '1' ? ': ' . fmt_money($priceNum) . ' за шт.' : '')
     . ($pack ? ', в упаковке ' . fmt_qty($pack) . ' шт.' : '')
-    . '. Заказ от ' . fmt_qty(min_order()) . ' шт., отгрузка со склада в Краснодаре, доставка транспортными компаниями.';
+    . '.' . (min_order() > 0 ? ' Заказ от ' . fmt_qty(min_order()) . ' шт.,' : '') . ' Отгрузка со склада в Краснодаре, доставка транспортными компаниями.';
 $ldProduct = array_filter([
     '@context' => 'https://schema.org', '@type' => 'Product',
     'name' => $fullName, 'sku' => $p['sku'] ?: null, 'category' => $p['category_name'] ?: null,
     'description' => seo_cut($p['description'] ?: $autoDesc, 500),
     'image' => $photos ? array_map(fn($f) => str_starts_with($f, 'assets/') ? abs_url($f) : abs_url('uploads/' . $f), $photos) : null,
     'brand' => ['@type' => 'Brand', 'name' => 'LEONPRO'],
-    'offers' => $priceNum > 0 && setting('show_prices') === '1' ? [
+    'offers' => $priceNum > 0 && setting('show_prices') === '1' ? array_filter([
         '@type' => 'Offer', 'url' => abs_url('product.php?id=' . $id), 'priceCurrency' => 'RUB', 'price' => round($priceNum, 2),
-        'availability' => 'https://schema.org/InStock', 'eligibleQuantity' => ['@type' => 'QuantitativeValue', 'minValue' => min_order(), 'unitCode' => 'H87'],
+        'availability' => 'https://schema.org/InStock',
+        'eligibleQuantity' => min_order() > 0 ? ['@type' => 'QuantitativeValue', 'minValue' => min_order(), 'unitCode' => 'H87'] : null,
         'seller' => ['@type' => 'Organization', 'name' => setting('legal_name') ?: setting('site_name')],
-    ] : null,
+    ], fn($v) => $v !== null) : null,
 ], fn($v) => $v !== null);
 $crumbs = [['Главная', ''], ['Каталог', 'catalog.php']];
 if ($p['category_id']) $crumbs[] = [$p['category_name'], 'catalog.php?cat=' . $p['category_id']];
@@ -101,7 +102,7 @@ page_header($fullName, [
           <button class="btn btn-accent btn-lg" type="submit"><?= $inCart ? 'Обновить в корзине' : 'Добавить в корзину' ?></button>
         </div>
         <?php if ($inCart): ?><a href="<?= url('cart.php') ?>"><b>Товар в корзине — перейти к оформлению →</b></a><?php endif; ?>
-        <span class="muted small">Минимальный заказ — <?= fmt_qty(min_order()) ?> шт. по всей корзине. <?= $pack ? 'Укажите количество упаковок, в упаковке ' . fmt_qty($pack) . ' шт.' : 'Заказ кратен ' . fmt_qty($step) . ' шт.' ?></span>
+        <span class="muted small"><?= min_order() > 0 ? 'Минимальный заказ — ' . fmt_qty(min_order()) . ' шт. по всей корзине. ' : '' ?><?= $pack ? 'Укажите количество упаковок, в упаковке ' . fmt_qty($pack) . ' шт.' : 'Заказ кратен ' . fmt_qty($step) . ' шт.' ?></span>
       </form>
 
       <div data-tabs>

@@ -117,7 +117,7 @@ function page_header(string $title = '', array $opt = []): void
   <div class="topbar">
     <div class="container topbar-in">
       <span><?= e(setting('topbar_text')) ?></span>
-      <span>Заказ от <?= fmt_qty(min_order()) ?> шт.</span>
+      <?php if (min_order() > 0): ?><span>Заказ от <?= fmt_qty(min_order()) ?> шт.</span><?php endif; ?>
       <a class="topbar-phone" href="tel:<?= e(preg_replace('~[^\d+]~', '', setting('phone'))) ?>"><?= e(setting('phone')) ?></a>
     </div>
   </div>

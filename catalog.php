@@ -64,10 +64,10 @@ $crumbs = [['Главная', ''], ['Каталог', 'catalog.php']];
 if ($curCat) {
     $crumbs[] = [$curCat['name'], 'catalog.php?cat=' . $curCat['id']];
     $seoTitle = $curCat['seo_title'] ?: $curCat['name'] . ' оптом от производителя — ' . setting('site_name');
-    $seoDesc = $curCat['seo_description'] ?: ($curCat['description'] ? rtrim($curCat['description'], '. ') . '. ' : '') . $curCat['name'] . ' оптом от производителя ' . setting('site_name') . ': заказ от ' . fmt_qty(min_order()) . ' шт., отгрузка со склада в Краснодаре, доставка по России.';
+    $seoDesc = $curCat['seo_description'] ?: ($curCat['description'] ? rtrim($curCat['description'], '. ') . '. ' : '') . $curCat['name'] . ' оптом от производителя ' . setting('site_name') . ':' . (min_order() > 0 ? ' заказ от ' . fmt_qty(min_order()) . ' шт.,' : '') . ' отгрузка со склада в Краснодаре, доставка по России.';
 } else {
     $seoTitle = 'Каталог: тарельчатые дюбели, площадки под стяжку, якорные скобы и СВП оптом — ' . setting('site_name');
-    $seoDesc = 'Каталог крепежа для теплоизоляции и стяжки от производителя ' . setting('site_name') . '. Оптовые цены, заказ от ' . fmt_qty(min_order()) . ' шт., склад в Краснодаре.';
+    $seoDesc = 'Каталог крепежа для теплоизоляции и стяжки от производителя ' . setting('site_name') . '. Оптовые цены' . (min_order() > 0 ? ', заказ от ' . fmt_qty(min_order()) . ' шт.' : '') . ', склад в Краснодаре.';
 }
 page_header($curCat['name'] ?? 'Каталог', [
     'title_raw' => $seoTitle,
@@ -128,11 +128,13 @@ page_header($curCat['name'] ?? 'Каталог', [
     </details>
 
     <div class="catalog-main">
+      <?php if ($min > 0): ?>
       <div class="notice">
         <span><b>Минимальный заказ — <?= fmt_qty($min) ?> шт.</b> по всей корзине</span>
         <span>В корзине: <b><?= fmt_qty($inCart) ?> шт.</b></span>
         <a class="push" href="<?= url('cart.php') ?>">Перейти в корзину →</a>
       </div>
+      <?php endif; ?>
       <?php if (!$rows): ?>
         <p class="empty">Ничего не найдено — измените запрос или фильтры.</p>
       <?php else: ?>
