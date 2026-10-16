@@ -68,7 +68,7 @@ if (is_post()) {
             order_event($orderId, 'new', 'сайт');
             foreach ($items as $it) {
                 q('INSERT INTO order_items (order_id, product_id, name, size, price, qty, pack_qty) VALUES (?,?,?,?,?,?,?)',
-                    [$orderId, $it['id'], $it['name'], $it['size'], $it['price'], $it['qty'], product_pack($it)]);
+                    [$orderId, $it['id'], $it['name'], $it['size'], price_per_piece($it), $it['qty'], product_pack($it)]);
             }
             // Сохраняем реквизиты в профиль, если поля пустые
             if ($user) {
@@ -81,7 +81,7 @@ if (is_post()) {
             // Письма
             $lines = [];
             foreach ($items as $it) {
-                $lines[] = '— ' . $it['name'] . ' ' . $it['size'] . ': ' . fmt_packs((int)$it['qty'], product_pack($it)) . ((float)$it['price'] > 0 ? ' × ' . fmt_money($it['price']) . '/шт.' : '');
+                $lines[] = '— ' . $it['name'] . ' ' . $it['size'] . ': ' . fmt_packs((int)$it['qty'], product_pack($it)) . ((float)$it['price'] > 0 ? ' × ' . fmt_money($it['price']) . '/' . price_unit($it) : '');
             }
             $body = "Заявка № $orderId от " . date('d.m.Y H:i') . "\n\n"
                 . "Компания: {$old['company']}\nИНН: {$old['inn']}\nКонтактное лицо: {$old['contact']}\n"
@@ -167,7 +167,7 @@ page_header('Корзина', ['robots' => 'noindex, follow']);
               <tr>
                 <td class="c-img"><?= product_thumb($it) ?></td>
                 <td><a class="pname" href="<?= url('product.php?id=' . $it['id']) ?>"><?= e($it['name']) ?></a><div class="sub"><?= e($it['size']) ?><?= $it['pack_qty'] ? ' · ' . fmt_qty($it['pack_qty']) . ' шт./уп.' : '' ?></div></td>
-                <td class="num price"><?= price_label($it) ?></td>
+                <td class="num price"><?= price_cell($it) ?></td>
                 <td class="c-act"><div class="row-form" style="justify-content:flex-start">
                   <?= qty_input('qty[' . $it['id'] . ']', product_pack($it) ? (int)ceil($it['qty'] / product_pack($it)) : (int)$it['qty'], product_step($it), '', product_pack($it)) ?>
                   <button class="icon-btn" type="submit" form="rm-<?= $it['id'] ?>" aria-label="Удалить <?= e($it['name']) ?>"><?= icon('trash', 20) ?></button>

@@ -21,32 +21,60 @@
     input.addEventListener('blur', function () { set(parseInt(input.value, 10) || step); });
   });
 
-  // Галерея фото товара: клик по миниатюре меняет большое фото, стрелки ← → листают
-  document.querySelectorAll('[data-gallery]').forEach(function (g) {
-    var main = g.querySelector('[data-gallery-main]');
-    var btns = Array.prototype.slice.call(g.querySelectorAll('.thumb-btn'));
-    if (!main || btns.length < 2) return;
-    function show(i) {
-      i = (i + btns.length) % btns.length;
-      main.src = btns[i].dataset.src;
-      btns.forEach(function (b, k) { b.classList.toggle('on', k === i); if (k === i) b.setAttribute('aria-current', 'true'); else b.removeAttribute('aria-current'); });
-      return i;
-    }
+  // Карусель фото и видео товара: стрелки, свайп, миниатюры, клавиши ← →
+  document.querySelectorAll('[data-carousel]').forEach(function (car) {
+    var track = car.querySelector('[data-track]');
+    var slides = Array.prototype.slice.call(car.querySelectorAll('[data-slide]'));
+    var thumbs = Array.prototype.slice.call(document.querySelectorAll('[data-thumb]'));
+    var prev = car.querySelector('[data-prev]');
+    var next = car.querySelector('[data-next]');
+    var count = car.querySelector('[data-count]');
     var cur = 0;
-    btns.forEach(function (b, k) { b.addEventListener('click', function () { cur = show(k); }); });
-    g.addEventListener('keydown', function (e) {
-      if (e.key === 'ArrowRight') { cur = show(cur + 1); btns[cur].focus(); }
-      if (e.key === 'ArrowLeft') { cur = show(cur - 1); btns[cur].focus(); }
+    if (slides.length < 2) return;
+
+    function stopOthers(i) {
+      slides.forEach(function (s, k) {
+        if (k === i) return;
+        var v = s.querySelector('video');
+        if (v && !v.paused) v.pause();
+        var f = s.querySelector('iframe');
+        if (f && f.getAttribute('src')) f.setAttribute('src', f.getAttribute('src')); // перезагрузка останавливает плеер
+      });
+      var fr = slides[i].querySelector('iframe[data-src]');
+      if (fr && !fr.getAttribute('src')) fr.setAttribute('src', fr.dataset.src);
+    }
+    function mark(i) {
+      if (i === cur) return;
+      cur = i;
+      stopOthers(i);
+      if (count) count.textContent = (i + 1) + ' / ' + slides.length;
+      if (prev) prev.disabled = i === 0;
+      if (next) next.disabled = i === slides.length - 1;
+      thumbs.forEach(function (t, k) {
+        t.classList.toggle('on', k === i);
+        if (k === i) { t.setAttribute('aria-current', 'true'); t.scrollIntoView({ block: 'nearest', inline: 'nearest' }); }
+        else t.removeAttribute('aria-current');
+      });
+    }
+    function go(i) {
+      i = Math.max(0, Math.min(slides.length - 1, i));
+      track.scrollTo({ left: i * track.clientWidth });
+      mark(i);
+    }
+    if (prev) { prev.disabled = true; prev.addEventListener('click', function () { go(cur - 1); }); }
+    if (next) next.addEventListener('click', function () { go(cur + 1); });
+    thumbs.forEach(function (t) { t.addEventListener('click', function () { go(parseInt(t.dataset.thumb, 10)); }); });
+    var timer;
+    track.addEventListener('scroll', function () {
+      clearTimeout(timer);
+      timer = setTimeout(function () { mark(Math.round(track.scrollLeft / track.clientWidth)); }, 80);
+    }, { passive: true });
+    car.addEventListener('keydown', function (e) {
+      if (e.target.tagName === 'VIDEO') return;
+      if (e.key === 'ArrowRight') { e.preventDefault(); go(cur + 1); }
+      if (e.key === 'ArrowLeft') { e.preventDefault(); go(cur - 1); }
     });
-    // Свайп по большому фото на телефоне
-    var x0 = null;
-    main.addEventListener('touchstart', function (e) { x0 = e.touches[0].clientX; }, { passive: true });
-    main.addEventListener('touchend', function (e) {
-      if (x0 === null) return;
-      var dx = e.changedTouches[0].clientX - x0;
-      if (Math.abs(dx) > 40) cur = show(cur + (dx < 0 ? 1 : -1));
-      x0 = null;
-    });
+    window.addEventListener('resize', function () { track.scrollTo({ left: cur * track.clientWidth, behavior: 'auto' }); });
   });
 
   // Автосохранение количества в корзине

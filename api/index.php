@@ -10,7 +10,7 @@ if ($path === '/robots.txt') $path = '/robots.php';
 if (str_starts_with($path, '/uploads/')) {
     $base = realpath('/tmp/leonpro/uploads');
     $f = $base ? realpath($base . substr($path, 8)) : false;
-    $types = ['jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'svg' => 'image/svg+xml', 'pdf' => 'application/pdf'];
+    $types = ['jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'svg' => 'image/svg+xml', 'pdf' => 'application/pdf', 'mp4' => 'video/mp4', 'webm' => 'video/webm', 'mov' => 'video/quicktime'];
     $ext = strtolower(pathinfo((string)$f, PATHINFO_EXTENSION));
     if ($f && str_starts_with($f, $base . '/') && isset($types[$ext])) {
         header('Content-Type: ' . $types[$ext]);

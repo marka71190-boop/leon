@@ -40,7 +40,7 @@ function settings_schema(): array
         'min_order_qty'    => ['Заказы', 'Минимальный заказ, шт.', 'int', '5000', 'Суммарно по корзине. 0 — без минимального заказа: упоминания о нём исчезнут со всех страниц сайта'],
         'default_step'     => ['Заказы', 'Шаг количества по умолчанию, шт.', 'int', '500', 'Если у товара не указана кратность'],
         'show_prices'      => ['Заказы', 'Показывать цены', 'bool', '1', 'Если выключено — «Цена по запросу»'],
-        'price_note'       => ['Заказы', 'Пометка к ценам', 'text', 'Оптовая цена за штуку', 'Например, «Цены с НДС» после перехода на НДС'],
+        'price_note'       => ['Заказы', 'Пометка к ценам', 'text', 'Цена', 'Например, «Цены с НДС» после перехода на НДС'],
         'delivery_note'    => ['Заказы', 'Коротко о доставке', 'textarea', 'Отгрузка со склада в Краснодаре через транспортные компании. Доставку оплачивает покупатель.', ''],
         'order_success'    => ['Заказы', 'Текст после отправки заявки', 'textarea', 'Менеджер свяжется с вами, подтвердит состав заказа, согласует стоимость и транспортную компанию.', ''],
 
@@ -222,12 +222,36 @@ function fmt_money($n): string
     return number_format($n, $dec, ',', ' ') . ' ₽';
 }
 
+/**
+ * Цена товара как её указали в админке: за упаковку, если задана фасовка, иначе за штуку.
+ * Ничего не умножается на фасовку.
+ */
 function price_label(array $p): string
 {
     if (setting('show_prices') !== '1' || (float)$p['price'] <= 0) {
         return 'По запросу';
     }
     return fmt_money($p['price']);
+}
+
+/** За что указана цена: «уп.» для товаров с фасовкой, иначе «шт.» */
+function price_unit(array $p): string
+{
+    return product_pack($p) > 0 ? 'уп.' : 'шт.';
+}
+
+/** Цена для таблиц: «250 ₽» и под ней «за уп.» */
+function price_cell(array $p): string
+{
+    $label = price_label($p);
+    return $label === 'По запросу' ? $label : $label . '<span class="price-unit">за ' . price_unit($p) . '</span>';
+}
+
+/** Цена одной штуки (для подсчёта суммы заказа): цена упаковки делится на фасовку */
+function price_per_piece(array $p): float
+{
+    $pack = product_pack($p);
+    return $pack > 0 ? (float)$p['price'] / $pack : (float)$p['price'];
 }
 
 function product_step(array $p): int
@@ -346,6 +370,7 @@ function handle_upload(string $field, array $allowedExt, string $subdir): ?strin
     $okMime = [
         'jpg' => ['image/jpeg'], 'png' => ['image/png'], 'webp' => ['image/webp'],
         'svg' => ['image/svg+xml', 'text/xml', 'text/plain', 'application/xml'], 'pdf' => ['application/pdf'],
+        'mp4' => ['video/mp4', 'application/mp4'], 'webm' => ['video/webm', 'audio/webm'], 'mov' => ['video/quicktime', 'video/mp4'],
     ];
     if (isset($okMime[$ext]) && !in_array($mime, $okMime[$ext], true)) {
         throw new RuntimeException('Содержимое файла не соответствует расширению.');
@@ -403,7 +428,7 @@ function cart_items(): array
     $items = [];
     foreach ($rows as $r) {
         $r['qty'] = (int)$raw[$r['id']];
-        $r['line_sum'] = (float)$r['price'] * $r['qty'];
+        $r['line_sum'] = price_per_piece($r) * $r['qty'];
         $items[] = $r;
     }
     return $items;
@@ -516,10 +541,10 @@ function product_images(int $productId): array
     return q('SELECT * FROM product_images WHERE product_id = ? ORDER BY sort, id', [$productId])->fetchAll();
 }
 
-/** Главное фото товара = первое в галерее (хранится в products.image для каталога) */
+/** Главное фото товара = первое фото в галерее (видео пропускаются), хранится в products.image для каталога */
 function product_sync_cover(int $productId): void
 {
-    $first = q('SELECT file FROM product_images WHERE product_id = ? ORDER BY sort, id LIMIT 1', [$productId])->fetchColumn();
+    $first = q("SELECT file FROM product_images WHERE product_id = ? AND COALESCE(kind, 'image') = 'image' ORDER BY sort, id LIMIT 1", [$productId])->fetchColumn();
     q('UPDATE products SET image = ? WHERE id = ?', [$first ?: '', $productId]);
 }
 
@@ -744,5 +769,45 @@ function ld_organization(): array
         $org['sameAs'] = $same;
     }
     return array_filter($org, fn($v) => $v !== null);
+}
+
+/* ---------- Видео товара ---------- */
+
+/** Тип загруженного файла галереи по расширению: image или video */
+function media_kind_by_file(string $file): string
+{
+    return in_array(strtolower(pathinfo($file, PATHINFO_EXTENSION)), ['mp4', 'webm', 'mov'], true) ? 'video' : 'image';
+}
+
+/**
+ * Ссылка на видео Rutube, VK Видео или YouTube → адрес для встраивания на сайт.
+ * null — ссылка не распознана.
+ */
+function video_embed_url(string $url): ?string
+{
+    $url = trim($url);
+    if (preg_match('~(?:youtube\.com/(?:watch\?(?:.*&)?v=|shorts/|embed/|live/)|youtu\.be/)([A-Za-z0-9_-]{11})~', $url, $m)) {
+        return 'https://www.youtube.com/embed/' . $m[1];
+    }
+    if (preg_match('~rutube\.ru/(?:video|play/embed|shorts)/([a-f0-9]{32})~i', $url, $m)) {
+        return 'https://rutube.ru/play/embed/' . strtolower($m[1]);
+    }
+    if (preg_match('~(?:vk\.com|vk\.ru|vkvideo\.ru)/video_ext\.php\?oid=(-?\d+)&id=(\d+)~', $url, $m)
+        || preg_match('~(?:vk\.com|vk\.ru|vkvideo\.ru)/(?:[^?#]*[?&]z=)?video(-?\d+)_(\d+)~', $url, $m)) {
+        return 'https://vk.com/video_ext.php?oid=' . $m[1] . '&id=' . $m[2] . '&hd=2';
+    }
+    return null;
+}
+
+/** Картинка-превью для встроенного видео (есть только у YouTube) */
+function video_embed_thumb(string $embed): string
+{
+    return preg_match('~youtube\.com/embed/([A-Za-z0-9_-]{11})~', $embed, $m) ? 'https://img.youtube.com/vi/' . $m[1] . '/hqdefault.jpg' : '';
+}
+
+/** Название сервиса для подписи */
+function video_embed_service(string $embed): string
+{
+    return str_contains($embed, 'youtube') ? 'YouTube' : (str_contains($embed, 'rutube') ? 'Rutube' : 'VK Видео');
 }
 

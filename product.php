@@ -15,7 +15,12 @@ $related = q('SELECT * FROM products WHERE category_id IS ? AND id <> ? AND acti
 $step = product_step($p);
 $pack = product_pack($p);
 $fullName = trim($p['name'] . ' ' . $p['size']);
-$photos = array_column(product_images($id), 'file') ?: ($p['image'] ? [$p['image']] : []);
+// Галерея: фото, видеофайлы и ссылки на видео в порядке из админки
+$media = product_images($id);
+if (!$media && $p['image']) {
+    $media = [['file' => $p['image'], 'kind' => 'image']];
+}
+$photos = array_values(array_column(array_filter($media, fn($m) => ($m['kind'] ?? 'image') === 'image'), 'file'));
 $cart = cart_raw();
 $inCart = isset($cart[$id]);
 // Сколько показать в поле: уже в корзине или столько, чтобы набрать минимальный заказ
@@ -38,7 +43,7 @@ foreach (preg_split('~\R~u', (string)$p['specs']) as $line) {
 // SEO: заголовок и описание из админки или собираются автоматически
 $priceNum = (float)$p['price'];
 $autoDesc = $fullName . ' оптом от производителя ' . setting('site_name')
-    . ($priceNum > 0 && setting('show_prices') === '1' ? ': ' . fmt_money($priceNum) . ' за шт.' : '')
+    . ($priceNum > 0 && setting('show_prices') === '1' ? ': ' . fmt_money($priceNum) . ($pack ? ' за упаковку' : ' за шт.') : '')
     . ($pack ? ', в упаковке ' . fmt_qty($pack) . ' шт.' : '')
     . '.' . (min_order() > 0 ? ' Заказ от ' . fmt_qty(min_order()) . ' шт.,' : '') . ' Отгрузка со склада в Краснодаре, доставка транспортными компаниями.';
 $ldProduct = array_filter([
@@ -50,6 +55,8 @@ $ldProduct = array_filter([
     'offers' => $priceNum > 0 && setting('show_prices') === '1' ? array_filter([
         '@type' => 'Offer', 'url' => abs_url('product.php?id=' . $id), 'priceCurrency' => 'RUB', 'price' => round($priceNum, 2),
         'availability' => 'https://schema.org/InStock',
+        'priceSpecification' => $pack ? ['@type' => 'UnitPriceSpecification', 'price' => round($priceNum, 2), 'priceCurrency' => 'RUB',
+            'referenceQuantity' => ['@type' => 'QuantitativeValue', 'value' => $pack, 'unitCode' => 'H87']] : null,
         'eligibleQuantity' => min_order() > 0 ? ['@type' => 'QuantitativeValue', 'minValue' => min_order(), 'unitCode' => 'H87'] : null,
         'seller' => ['@type' => 'Organization', 'name' => setting('legal_name') ?: setting('site_name')],
     ], fn($v) => $v !== null) : null,
@@ -70,14 +77,35 @@ page_header($fullName, [
   <nav class="crumbs" aria-label="Навигация"><a href="<?= url() ?>">Главная</a> / <a href="<?= url('catalog.php') ?>">Каталог</a><?php if ($p['category_id']): ?> / <a href="<?= url('catalog.php?cat=' . $p['category_id']) ?>"><?= e($p['category_name']) ?></a><?php endif; ?></nav>
 
   <div class="product">
-    <div class="product-gallery" data-gallery>
-      <?php if ($photos): ?>
-        <img class="main-img" src="<?= e(upload_url($photos[0])) ?>" alt="<?= e($fullName) ?>" data-gallery-main>
-        <?php if (count($photos) > 1): ?>
-          <div class="thumbs" role="list" aria-label="Фото товара">
-            <?php foreach ($photos as $i => $ph): ?>
-              <button type="button" role="listitem" class="thumb-btn<?= $i === 0 ? ' on' : '' ?>" data-src="<?= e(upload_url($ph)) ?>" aria-label="Фото <?= $i + 1 ?> из <?= count($photos) ?>"<?= $i === 0 ? ' aria-current="true"' : '' ?>>
-                <img src="<?= e(upload_url($ph)) ?>" alt="" loading="lazy">
+    <div class="product-gallery">
+      <?php if ($media): $n = count($media); ?>
+        <div class="pgal" data-carousel aria-roledescription="карусель" aria-label="Фото и видео товара">
+          <div class="pgal-track" data-track tabindex="0">
+            <?php foreach ($media as $i => $m): $kind = $m['kind'] ?? 'image'; ?>
+              <div class="pgal-slide" data-slide role="group" aria-roledescription="слайд" aria-label="<?= $i + 1 ?> из <?= $n ?>">
+                <?php if ($kind === 'video'): ?>
+                  <video src="<?= e(upload_url($m['file'])) ?>#t=0.1" controls playsinline preload="metadata"></video>
+                <?php elseif ($kind === 'embed'): ?>
+                  <iframe data-src="<?= e($m['file']) ?>" title="Видео: <?= e($fullName) ?>" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowfullscreen loading="lazy"<?= $i === 0 ? ' src="' . e($m['file']) . '"' : '' ?>></iframe>
+                <?php else: ?>
+                  <img src="<?= e(upload_url($m['file'])) ?>" alt="<?= e($fullName) ?><?= $n > 1 ? ' — фото ' . ($i + 1) : '' ?>"<?= $i ? ' loading="lazy"' : '' ?>>
+                <?php endif; ?>
+              </div>
+            <?php endforeach; ?>
+          </div>
+          <?php if ($n > 1): ?>
+            <button type="button" class="pgal-nav pgal-prev" data-prev aria-label="Предыдущее">‹</button>
+            <button type="button" class="pgal-nav pgal-next" data-next aria-label="Следующее">›</button>
+            <span class="pgal-count" data-count aria-live="polite">1 / <?= $n ?></span>
+          <?php endif; ?>
+        </div>
+        <?php if ($n > 1): ?>
+          <div class="thumbs" aria-label="Все фото и видео">
+            <?php foreach ($media as $i => $m): $kind = $m['kind'] ?? 'image'; ?>
+              <button type="button" class="thumb-btn<?= $i === 0 ? ' on' : '' ?><?= $kind !== 'image' ? ' is-video' : '' ?>" data-thumb="<?= $i ?>" aria-label="<?= $kind === 'image' ? 'Фото' : 'Видео' ?> <?= $i + 1 ?> из <?= $n ?>"<?= $i === 0 ? ' aria-current="true"' : '' ?>>
+                <?php if ($kind === 'image'): ?><img src="<?= e(upload_url($m['file'])) ?>" alt="" loading="lazy">
+                <?php elseif ($kind === 'video'): ?><video src="<?= e(upload_url($m['file'])) ?>#t=0.5" preload="metadata" muted playsinline tabindex="-1"></video>
+                <?php elseif ($th = video_embed_thumb($m['file'])): ?><img src="<?= e($th) ?>" alt="" loading="lazy"><?php endif; ?>
               </button>
             <?php endforeach; ?>
           </div>
@@ -95,8 +123,8 @@ page_header($fullName, [
 
       <form class="buy-box" method="post" action="<?= url('cart.php') ?>">
         <?= csrf_field() ?><input type="hidden" name="action" value="add"><input type="hidden" name="product_id" value="<?= $id ?>">
-        <div class="buy-price"><span class="muted"><?= e(setting('price_note')) ?></span><b><?= price_label($p) ?><?php if (price_label($p) !== 'По запросу'): ?><span class="muted" style="font:500 15px var(--font)"> / шт.</span><?php endif; ?></b>
-          <?php if ($pack && price_label($p) !== 'По запросу'): ?><span class="muted small"><?= fmt_money((float)$p['price'] * $pack) ?> за упаковку (<?= fmt_qty($pack) ?> шт.)</span><?php endif; ?></div>
+        <div class="buy-price"><span class="muted"><?= e(setting('price_note')) ?></span><b><?= price_label($p) ?><?php if (price_label($p) !== 'По запросу'): ?><span class="muted" style="font:500 15px var(--font)"> / <?= $pack ? 'упаковка' : 'шт.' ?></span><?php endif; ?></b>
+          <?php if ($pack): ?><span class="muted small">В упаковке <?= fmt_qty($pack) ?> шт.<?= price_label($p) !== 'По запросу' ? ' · ' . fmt_money(round(price_per_piece($p), 2)) . ' за шт.' : '' ?></span><?php endif; ?></div>
         <div class="buy-row">
           <?= qty_input('qty', $qtyValue, $step, '', $pack) ?>
           <button class="btn btn-accent btn-lg" type="submit"><?= $inCart ? 'Обновить в корзине' : 'Добавить в корзину' ?></button>

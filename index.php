@@ -66,7 +66,7 @@ page_header('', [
     </div>
     <div class="table-wrap has-cards">
       <table class="table table-dark cards">
-        <thead><tr><th><span class="sr-only">Фото</span></th><th>Наименование</th><th>Размер</th><th>Фасовка</th><th class="num">Цена, опт</th><th><span class="sr-only">Действие</span></th></tr></thead>
+        <thead><tr><th><span class="sr-only">Фото</span></th><th>Наименование</th><th>Размер</th><th>Фасовка</th><th class="num">Цена</th><th><span class="sr-only">Действие</span></th></tr></thead>
         <tbody>
         <?php foreach ($popular as $p): ?>
           <tr>
@@ -74,7 +74,7 @@ page_header('', [
             <td><a class="pname" href="<?= url('product.php?id=' . $p['id']) ?>"><?= e($p['name']) ?></a><div class="sub"><?= e($p['category_name']) ?></div></td>
             <td><?= e($p['size'] ?: '—') ?></td>
             <td class="muted"><?= $p['pack_qty'] ? fmt_qty($p['pack_qty']) . ' шт./уп.' : '—' ?></td>
-            <td class="num price"><?= price_label($p) ?></td>
+            <td class="num price"><?= price_cell($p) ?></td>
             <td class="c-act" style="text-align:right"><a class="btn btn-outline" href="<?= url('product.php?id=' . $p['id']) ?>">Подробнее</a></td>
           </tr>
         <?php endforeach; ?>

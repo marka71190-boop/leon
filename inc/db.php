@@ -162,6 +162,16 @@ SQL);
         $st->execute(['2.1. Минимальный объём заказа — 5 000 шт. по всей заявке.', '2.1. {{минимальный заказ в оферте}}']);
         $pdo->exec("INSERT INTO settings (key, value) VALUES ('db_version', '8') ON CONFLICT(key) DO UPDATE SET value = '8'");
     }
+    if ($v < 9) {
+        // Цена товара с фасовкой — за упаковку; пометка «Оптовая цена за штуку» больше не верна
+        $pdo->exec("UPDATE settings SET value = 'Цена' WHERE key = 'price_note' AND value = 'Оптовая цена за штуку'");
+        // Фото и видео товара: тип записи (image — фото, video — видеофайл, embed — ссылка на видео)
+        $cols = array_column($pdo->query('PRAGMA table_info(product_images)')->fetchAll(), 'name');
+        if (!in_array('kind', $cols, true)) {
+            $pdo->exec("ALTER TABLE product_images ADD COLUMN kind TEXT DEFAULT 'image'");
+        }
+        $pdo->exec("INSERT INTO settings (key, value) VALUES ('db_version', '9') ON CONFLICT(key) DO UPDATE SET value = '9'");
+    }
 }
 
 function table_exists(PDO $pdo, string $name): bool

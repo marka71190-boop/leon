@@ -22,6 +22,8 @@ services:
       - "443:443"
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:-:80}
+      # Номер версии Caddyfile: при изменении Caddy перезапускается и читает новые настройки
+      CADDYFILE_REV: "2"
     volumes:
       - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

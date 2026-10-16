@@ -68,6 +68,11 @@ if (is_post()) {
         foreach ((array)($_POST['items'] ?? []) as $itemId => $row) {
             $qty = max(0, (int)($row['qty'] ?? 0));
             $price = max(0, (float)str_replace([',', ' '], ['.', ''], (string)($row['price'] ?? '0')));
+            // Для товаров с фасовкой менеджер вводит цену за упаковку, в заказе хранится цена штуки
+            $pk = (int)q('SELECT pack_qty FROM order_items WHERE id = ? AND order_id = ?', [(int)$itemId, $id])->fetchColumn();
+            if ($pk > 0) {
+                $price = $price / $pk;
+            }
             if ($qty === 0 || !empty($row['remove'])) {
                 q('DELETE FROM order_items WHERE id = ? AND order_id = ?', [(int)$itemId, $id]);
             } else {
@@ -158,13 +163,13 @@ if ($id) {
         <h2>Состав заказа</h2>
         <p class="a-muted" style="margin-top:-6px">После согласования с клиентом можно изменить количество и цену. 0 или «Убрать» — позиция удаляется.</p>
         <div class="a-table-wrap"><table class="a-table">
-          <thead><tr><th>Товар</th><th>Упаковки</th><th>Цена, ₽/шт.</th><th>Количество, шт.</th><th class="num">Сумма</th><th>Убрать</th></tr></thead>
+          <thead><tr><th>Товар</th><th>Упаковки</th><th>Цена, ₽</th><th>Количество, шт.</th><th class="num">Сумма</th><th>Убрать</th></tr></thead>
           <tbody>
           <?php foreach ($items as $it): $pk = (int)$it['pack_qty']; ?>
             <tr>
               <td><?= e($it['name']) ?> <?= e($it['size']) ?></td>
               <td style="white-space:nowrap"><?= $pk ? fmt_qty(intdiv((int)$it['qty'], $pk)) . ' уп.' . ((int)$it['qty'] % $pk ? ' + ' . fmt_qty((int)$it['qty'] % $pk) . ' шт.' : '') . '<div class="a-muted" style="font-size:12px">по ' . fmt_qty($pk) . ' шт.</div>' : '<span class="a-muted">поштучно</span>' ?></td>
-              <td><input class="a-input" style="width:110px" name="items[<?= $it['id'] ?>][price]" value="<?= e(rtrim(rtrim(number_format((float)$it['price'], 2, '.', ''), '0'), '.')) ?>"></td>
+              <td style="white-space:nowrap"><input class="a-input" style="width:110px" name="items[<?= $it['id'] ?>][price]" value="<?= e(rtrim(rtrim(number_format((float)$it['price'] * ($pk ?: 1), 2, '.', ''), '0'), '.')) ?>"> <span class="a-muted" style="font-size:12px">за <?= $pk ? 'уп.' : 'шт.' ?></span></td>
               <td><input class="a-input" style="width:120px" type="number" min="0"<?= $pk ? ' step="' . $pk . '"' : '' ?> name="items[<?= $it['id'] ?>][qty]" value="<?= (int)$it['qty'] ?>"></td>
               <td class="num"><?= (float)$it['price'] > 0 ? fmt_money($it['price'] * $it['qty']) : '—' ?></td>
               <td><input type="checkbox" name="items[<?= $it['id'] ?>][remove]" value="1" aria-label="Убрать позицию"></td>

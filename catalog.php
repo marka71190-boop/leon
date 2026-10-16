@@ -140,7 +140,7 @@ page_header($curCat['name'] ?? 'Каталог', [
       <?php else: ?>
       <div class="table-wrap has-cards">
         <table class="table cards">
-          <thead><tr><th><span class="sr-only">Фото</span></th><th>Наименование</th><th>Размер</th><th>Фасовка</th><th class="num">Цена, опт</th><th>Количество</th></tr></thead>
+          <thead><tr><th><span class="sr-only">Фото</span></th><th>Наименование</th><th>Размер</th><th>Фасовка</th><th class="num">Цена</th><th>Количество</th></tr></thead>
           <tbody>
           <?php foreach ($rows as $p): $step = product_step($p); $pack = product_pack($p);
                 $want = (int)($cart[$p['id']] ?? $step * 2);
@@ -151,7 +151,7 @@ page_header($curCat['name'] ?? 'Каталог', [
                 <div class="sub"><?= e($p['category_name']) ?><?= $p['sku'] ? ' · арт. ' . e($p['sku']) : '' ?><?= $p['material'] ? ' · ' . e($p['material']) : '' ?></div></td>
               <td><?= e($p['size'] ?: '—') ?></td>
               <td class="muted c-hide"><?= $p['pack_qty'] ? fmt_qty($p['pack_qty']) . ' шт./уп.' : '—' ?></td>
-              <td class="num price"><?= price_label($p) ?></td>
+              <td class="num price"><?= price_cell($p) ?></td>
               <td class="c-act">
                 <form class="row-form" method="post" action="<?= url('cart.php') ?>">
                   <?= csrf_field() ?><input type="hidden" name="action" value="add"><input type="hidden" name="product_id" value="<?= $p['id'] ?>">

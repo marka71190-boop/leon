@@ -179,6 +179,28 @@ h3 { font-size: 18px; margin: 0 0 10px; }
 .product { display: flex; flex-wrap: wrap; gap: 36px; align-items: flex-start; }
 .product-gallery { flex: 1 1 420px; min-width: 0; }
 .product-gallery .main-img { aspect-ratio: 1 / 1; max-height: 520px; width: 100%; background: #F3F3F4; border: 1px solid var(--line); border-radius: var(--radius); display: flex; align-items: center; justify-content: center; object-fit: contain; }
+.price-unit { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
+.pgal { position: relative; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; background: #F3F3F4; }
+.pgal-track { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; scroll-behavior: smooth; scrollbar-width: none; overscroll-behavior-x: contain; }
+.pgal-track::-webkit-scrollbar { display: none; }
+.pgal-track:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.pgal-slide { flex: 0 0 100%; aspect-ratio: 1 / 1; max-height: 560px; scroll-snap-align: center; display: flex; align-items: center; justify-content: center; }
+.pgal-slide img, .pgal-slide video { width: 100%; height: 100%; object-fit: contain; display: block; }
+.pgal-slide video, .pgal-slide iframe { background: #000; }
+.pgal-slide iframe { width: 100%; height: 100%; border: 0; display: block; }
+.pgal-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--line-2); background: rgba(255,255,255,.92); color: var(--ink); font-size: 26px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; box-shadow: 0 1px 4px rgba(0,0,0,.12); }
+.pgal-nav:hover { background: #fff; border-color: var(--ink); }
+.pgal-nav:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.pgal-nav[disabled] { opacity: .35; cursor: default; }
+.pgal-prev { left: 10px; }
+.pgal-next { right: 10px; }
+.pgal-count { position: absolute; right: 10px; top: 10px; background: rgba(23,23,26,.75); color: #fff; font-size: 13px; font-weight: 600; padding: 3px 9px; border-radius: 12px; font-variant-numeric: tabular-nums; pointer-events: none; }
+.thumb-btn { position: relative; }
+.thumb-btn video { width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
+.thumb-btn.is-video { background: #1A1A1C; }
+.thumb-btn.is-video::after { content: '▶'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 20px; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+@media (max-width: 760px) { .pgal-nav { width: 38px; height: 38px; font-size: 22px; } }
+@media (prefers-reduced-motion: reduce) { .pgal-track { scroll-behavior: auto; } }
 .thumbs { display: flex; gap: 8px; margin-top: 10px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
 .thumb-btn { flex: 0 0 72px; width: 72px; height: 72px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: #F3F3F4; cursor: pointer; overflow: hidden; }
 .thumb-btn img { width: 100%; height: 100%; object-fit: contain; display: block; }

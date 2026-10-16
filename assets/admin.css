@@ -138,7 +138,11 @@ h2 { font-size: 18px; margin: 0 0 14px; }
 /* Фото товара */
 .a-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 12px; margin-bottom: 14px; }
 .a-photo { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #fff; display: flex; flex-direction: column; }
-.a-photo img { width: 100%; aspect-ratio: 1 / 1; object-fit: contain; background: var(--soft); display: block; }
+.a-photo img, .a-photo video { width: 100%; aspect-ratio: 1 / 1; object-fit: contain; background: var(--soft); display: block; }
+.a-photo video { background: #000; }
+.a-photo-embed { position: relative; aspect-ratio: 1 / 1; background: #1A1A1C; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.a-photo-embed img { position: absolute; inset: 0; height: 100%; object-fit: cover; opacity: .7; }
+.a-photo-embed span { position: relative; color: #fff; font-weight: 700; background: rgba(0,0,0,.55); padding: 6px 10px; border-radius: 6px; }
 .a-photo.is-main { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
 .a-photo-bar { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; align-items: center; }
 .a-photo-bar button { min-height: 30px; padding: 0 8px; border: 1px solid #BFC2C7; background: #fff; border-radius: 5px; cursor: pointer; font: inherit; font-size: 12px; }
