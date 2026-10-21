@@ -46,10 +46,15 @@ function settings_schema(): array
 
         'tg_token'         => ['Уведомления', 'Токен Telegram-бота', 'secret', '', 'Выдаёт @BotFather при создании бота. Хранится скрыто'],
         'tg_chats'         => ['Уведомления', 'ID чатов Telegram для заявок', 'text', '', 'Через запятую. Нажмите «Найти ID чата» ниже'],
+        'tg_hide_pd'       => ['Уведомления', 'Не отправлять в Telegram персональные данные клиентов', 'bool', '1', 'Включено: в Telegram уходят номер заявки, город, состав и сумма, а контакты клиента — по ссылке в админке. Telegram — иностранный сервис: передача туда имён, телефонов и email считается трансграничной и требует отдельного уведомления Роскомнадзора'],
         'tg_api_url'       => ['Уведомления', 'Адрес-посредник для Telegram', 'text', '', 'Только если хостинг не видит Telegram (заявки не доходят). Например, https://leonpro-tg.имя.workers.dev. Пусто — напрямую'],
         'manager_email'    => ['Уведомления', 'Email менеджера для новых заказов', 'text', '', 'Необязательно, дублирует заявки на почту. Можно несколько через запятую'],
         'mail_from'        => ['Уведомления', 'Адрес отправителя писем', 'text', '', 'Например, noreply@ваш-домен.ru (ящик на вашем домене)'],
 
+        'invoice_vat'      => ['Счёт', 'НДС в счёте', 'text', 'Без НДС', 'Например, «Без НДС» или «В том числе НДС 5%» — печатается под итогом'],
+        'invoice_signer'   => ['Счёт', 'Подпись в счёте (Фамилия И. О.)', 'text', '', 'Пусто — берётся из названия ИП, например «Леонов А. Г.»'],
+        'invoice_days'     => ['Счёт', 'Срок оплаты счёта, банковских дней', 'int', '5', ''],
+        'invoice_terms'    => ['Счёт', 'Условия внизу счёта', 'textarea', 'Оплата счёта означает согласие с условиями поставки (публичная оферта на сайте). Товар отгружается после поступления денег на расчётный счёт поставщика. Доставка оплачивается покупателем по тарифам транспортной компании.', ''],
         'seo_title'        => ['SEO', 'Заголовок сайта (title)', 'text', 'Leon_pro — тарельчатые дюбели, площадки под стяжку, якорные скобы и СВП оптом', ''],
         'seo_description'  => ['SEO', 'Описание (description)', 'textarea', 'Производитель крепежа для теплоизоляции и стяжки. Оптовые поставки со склада в Краснодаре.', ''],
         'site_url'         => ['SEO', 'Адрес сайта', 'text', '', 'Например, https://leonpro.ru — для карты сайта и ссылок в поисковиках. Пусто — определяется сам'],
@@ -116,10 +121,10 @@ function upload_url(?string $rel): string
 }
 
 /**
- * Блок реквизитов для страниц: метка {{реквизиты}} — полностью, с банком;
- * метка {{оператор}} — без банковских реквизитов (для политики персональных данных).
+ * Блок реквизитов для страниц сайта (метки {{реквизиты}} и {{оператор}}) — без банковских реквизитов.
+ * Банк, расчётный и корреспондентский счёт и БИК печатаются только в счёте на оплату.
  */
-function requisites_html(bool $withBank = true): string
+function requisites_html(bool $withBank = false): string
 {
     $rows = [
         [setting('legal_name'), ''],
@@ -144,8 +149,17 @@ function requisites_html(bool $withBank = true): string
 function render_content(string $html): string
 {
     $min = min_order();
-    return str_replace(['{{реквизиты}}', '{{requisites}}', '{{оператор}}', '{{продавец}}', '{{телефон}}', '{{минимальный заказ}}', '{{минимальный заказ в оферте}}'],
-        [requisites_html(), requisites_html(), requisites_html(false), e(setting('legal_name')), e(setting('phone')),
+    // Контакты оператора одной фразой: пустые (например, email) не показываются
+    $contacts = array_filter([
+        setting('phone') !== '' ? 'по телефону ' . e(setting('phone')) : '',
+        setting('email') !== '' ? 'по электронной почте ' . e(setting('email')) : '',
+        setting('legal_address') !== '' ? 'письмом по адресу: ' . e(setting('legal_address')) : '',
+    ]);
+    $site = preg_replace('~^https?://~', '', seo_base());
+    return str_replace(['{{реквизиты}}', '{{requisites}}', '{{оператор}}', '{{продавец}}', '{{телефон}}', '{{контакты}}', '{{сайт}}', '{{адрес}}',
+                        '{{минимальный заказ}}', '{{минимальный заказ в оферте}}'],
+        [requisites_html(), requisites_html(), requisites_html(), e(setting('legal_name')), e(setting('phone')),
+         implode(', ', $contacts), e($site), e(setting('legal_address')),
          $min > 0 ? ' Минимальный заказ — от ' . fmt_qty($min) . ' шт. по всей корзине.' : '',
          $min > 0 ? 'Минимальный объём заказа — ' . fmt_qty($min) . ' шт. по всей заявке.' : 'Заказ можно оформить на любое количество товара.'], $html);
 }
@@ -690,7 +704,7 @@ function send_mail(string $to, string $subject, string $body): bool
 function consent_kinds(): array
 {
     return [
-        'pd'     => ['Обработка персональных данных', 'privacy', 'Даю согласие на обработку персональных данных'],
+        'pd'     => ['Обработка персональных данных', 'consent', 'Даю согласие на обработку персональных данных'],
         'oferta' => ['Публичная оферта', 'oferta', 'Принимаю условия публичной оферты'],
     ];
 }
@@ -728,7 +742,8 @@ function consent_log(string $source, array $kinds, array $who, ?int $userId = nu
             continue;
         }
         [$label, $slug, $text] = $all[$kind];
-        $page = q('SELECT title, content FROM pages WHERE slug = ?', [$slug])->fetch();
+        $page = q('SELECT title, content FROM pages WHERE slug = ?', [$slug])->fetch()
+            ?: ($slug === 'consent' ? q("SELECT title, content FROM pages WHERE slug = 'privacy'")->fetch() : false);
         $title = $page['title'] ?? $label;
         $content = $page ? render_content((string)$page['content']) : '';
         $hash = substr(hash('sha256', $title . "\n" . $content), 0, 16);

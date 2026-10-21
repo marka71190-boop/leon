@@ -1,12 +1,40 @@
 <?php
 require dirname(__DIR__) . '/inc/bootstrap.php';
 require __DIR__ . '/_layout.php';
-require_admin('clients');
+$me = require_admin('clients');
+$isOwner = admin_can($me, 'owner');
 
 if (is_post()) {
     csrf_check();
     $id = (int)post('id');
     $action = post('action');
+    // Удаление всех клиентов — только главный администратор, с подтверждением словом УДАЛИТЬ
+    if ($action === 'purge') {
+        if (!$isOwner) {
+            flash('Удалить всех клиентов может только главный администратор.', 'error');
+        } elseif (mb_strtoupper(trim(post('confirm'))) !== 'УДАЛИТЬ') {
+            flash('Чтобы удалить всех клиентов, впишите слово УДАЛИТЬ.', 'error');
+        } else {
+            $n = (int)q('SELECT COUNT(*) FROM users')->fetchColumn();
+            $msg = 'Удалено клиентов: ' . $n . '.';
+            q('DELETE FROM users');
+            if (post('with_orders') === '1') {
+                $o = (int)q('SELECT COUNT(*) FROM orders')->fetchColumn();
+                q('DELETE FROM order_items');
+                q('DELETE FROM order_events');
+                q('DELETE FROM orders');
+                $msg .= ' Удалено заказов: ' . $o . '.';
+            }
+            if (post('with_consents') === '1') {
+                $c = (int)q('SELECT COUNT(*) FROM consents')->fetchColumn();
+                q('DELETE FROM consents');
+                q('DELETE FROM consent_docs');
+                $msg .= ' Журнал согласий очищен (' . $c . ' записей).';
+            }
+            flash($msg);
+        }
+        redirect('admin/clients.php');
+    }
     if ($action === 'password') {
         $pass = (string)($_POST['password'] ?? '');
         if (mb_strlen($pass) < 6) {
@@ -93,5 +121,18 @@ admin_header('Клиенты', 'clients');
   <?php endforeach; ?>
   </tbody>
 </table></div>
+<?php endif; ?>
+<?php if ($isOwner): ?>
+<details class="a-card a-danger-zone" style="margin-top:24px">
+  <summary><b>Удалить всех клиентов</b> <span class="a-muted">— только для главного администратора</span></summary>
+  <form method="post" class="a-form" style="margin-top:14px" data-confirm="Удалить всех клиентов без возможности восстановления?">
+    <?= csrf_field() ?><input type="hidden" name="action" value="purge">
+    <p style="margin:0">Удаляются все аккаунты покупателей. Восстановить их нельзя. Отметьте, что удалить вместе с ними:</p>
+    <label class="a-check"><input type="checkbox" name="with_orders" value="1"> Все заказы и их историю</label>
+    <label class="a-check"><input type="checkbox" name="with_consents" value="1"> Журнал согласий на обработку персональных данных</label>
+    <?= a_input('confirm', 'Для подтверждения впишите слово УДАЛИТЬ', '', 'text', '', ['required' => true, 'autocomplete' => 'off']) ?>
+    <div><button class="a-btn a-btn-danger" type="submit">Удалить всех клиентов</button></div>
+  </form>
+</details>
 <?php endif; ?>
 <?php admin_footer();

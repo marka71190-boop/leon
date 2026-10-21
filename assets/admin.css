@@ -149,4 +149,5 @@ h2 { font-size: 18px; margin: 0 0 14px; }
 .a-photo-bar button:hover { border-color: var(--ink); }
 .a-photo-bar .del { color: #A31515; border-color: #E8B4B4; margin-left: auto; }
 .a-photo-main { font-size: 12px; font-weight: 700; color: #7A3A08; background: #FFE4CC; border-radius: 5px; padding: 4px 8px; }
-
+.a-danger-zone { border-color: #E8B4B4; }
+.a-danger-zone summary { cursor: pointer; }

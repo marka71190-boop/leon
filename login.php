@@ -83,7 +83,7 @@ $qs = $backTo === 'cart.php' ? '&back=cart' : '';
         <label class="field">Телефон<input name="phone" type="tel" autocomplete="tel" placeholder="+7" value="<?= e($old['phone'] ?? '') ?>"><span class="hint">Укажите email, телефон или оба — входить можно по любому из них.</span></label>
         <label class="field">Название компании<input name="company" value="<?= e($old['company'] ?? '') ?>"></label>
         <label class="field">Пароль<input name="password" type="password" required minlength="6" autocomplete="new-password"><span class="hint">Не короче 6 символов</span></label>
-        <label class="check"><input type="checkbox" name="agree_pd" value="1" required> <span>Даю согласие на <a href="<?= url('page.php?p=privacy') ?>" target="_blank">обработку персональных данных</a> *</span></label>
+        <label class="check"><input type="checkbox" name="agree_pd" value="1" required> <span>Даю <a href="<?= url('page.php?p=consent') ?>" target="_blank">согласие на обработку персональных данных</a> в соответствии с <a href="<?= url('page.php?p=privacy') ?>" target="_blank">политикой</a> *</span></label>
         <button class="btn btn-accent btn-lg" type="submit">Зарегистрироваться</button>
       </form>
     <?php endif; ?>

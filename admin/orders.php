@@ -113,7 +113,7 @@ if ($id) {
     $tel = preg_replace('~[^\d+]~', '', (string)$o['phone']);
     admin_header('Заказ № ' . $id, 'orders');
     ?>
-    <div class="a-head"><h1>Заказ № <?= $id ?> <span class="pill pill-<?= e($o['status']) ?>" style="vertical-align:middle"><?= e(status_label($o['status'])) ?></span></h1><a href="<?= url('admin/orders.php') ?>">← Все заказы</a></div>
+    <div class="a-head"><h1>Заказ № <?= $id ?> <span class="pill pill-<?= e($o['status']) ?>" style="vertical-align:middle"><?= e(status_label($o['status'])) ?></span></h1><div class="a-actions"><a class="a-btn a-btn-dark a-btn-sm" href="<?= url('admin/invoice.php?id=' . $id) ?>" target="_blank"><?= $o['invoice_date'] ? 'Счёт № ' . $id . ' от ' . date('d.m.Y', strtotime($o['invoice_date'])) : 'Выставить счёт (PDF)' ?></a><a href="<?= url('admin/orders.php') ?>">← Все заказы</a></div></div>
     <p class="a-muted" style="margin-top:-12px"><b style="color:var(--ink)"><?= e($o['company']) ?></b> · <?= e($o['city']) ?> · <?= fmt_qty($o['total_qty']) ?> шт. · создан <?= date('d.m.Y H:i', strtotime($o['created_at'])) ?><?= $o['user_id'] ? ' · клиент зарегистрирован' : ' · без регистрации' ?></p>
 
     <ol class="a-steps<?= $cancelled ? ' is-cancelled' : '' ?>" aria-label="Этапы заказа">

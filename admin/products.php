@@ -278,7 +278,7 @@ $products = q('SELECT p.*, c.name AS cname, (SELECT COUNT(*) FROM documents d WH
 
 admin_header('Товары', 'products');
 ?>
-<div class="a-head"><h1>Товары</h1><a class="a-btn" href="<?= url('admin/products.php?edit=0' . ($catF ? '&cat=' . $catF : '')) ?>">+ Добавить товар</a></div>
+<div class="a-head"><h1>Товары</h1><div class="a-actions"><a class="a-btn a-btn-out" href="<?= url('admin/products_io.php') ?>">Excel: выгрузка и загрузка</a><a class="a-btn" href="<?= url('admin/products.php?edit=0' . ($catF ? '&cat=' . $catF : '')) ?>">+ Добавить товар</a></div></div>
 <div class="a-filters">
   <a class="a-chip <?= !$catF ? 'on' : '' ?>" href="<?= url('admin/products.php') ?>">Все</a>
   <?php foreach ($cats as $c): ?><a class="a-chip <?= $catF === (int)$c['id'] ? 'on' : '' ?>" href="<?= url('admin/products.php?cat=' . $c['id']) ?>"><?= e($c['name']) ?></a><?php endforeach; ?>

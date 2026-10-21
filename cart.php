@@ -89,11 +89,14 @@ if (is_post()) {
                 . "Комментарий: " . ($old['comment'] ?: '—') . "\n\nСостав:\n" . implode("\n", $lines)
                 . "\n\nИтого: " . fmt_qty($total) . ' шт.' . ($sum > 0 ? ', ориентировочно ' . fmt_money($sum) : '');
             // Заявка в Telegram-бот
+            // Без персональных данных (настройка по умолчанию): Telegram — иностранный сервис
+            $hidePd = setting('tg_hide_pd') !== '0';
             $tg = '<b>Новая заявка № ' . $orderId . '</b>' . "\n\n"
-                . '<b>' . tg_h($old['company']) . '</b>, ИНН ' . tg_h($old['inn']) . "\n"
-                . tg_h($old['contact']) . "\n" . tg_h($old['phone']) . "\n" . tg_h($old['email']) . "\n"
+                . ($hidePd ? 'Контакты клиента — в админке по ссылке ниже.' . "\n"
+                    : '<b>' . tg_h($old['company']) . '</b>, ИНН ' . tg_h($old['inn']) . "\n"
+                      . tg_h($old['contact']) . "\n" . tg_h($old['phone']) . "\n" . tg_h($old['email']) . "\n")
                 . 'Город: ' . tg_h($old['city']) . "\n"
-                . ($old['comment'] !== '' ? 'Комментарий: ' . tg_h($old['comment']) . "\n" : '')
+                . (!$hidePd && $old['comment'] !== '' ? 'Комментарий: ' . tg_h($old['comment']) . "\n" : '')
                 . "\n" . tg_h(implode("\n", $lines)) . "\n\n"
                 . '<b>Итого: ' . fmt_qty($total) . ' шт.</b>' . ($sum > 0 ? ', ориентировочно ' . tg_h(fmt_money($sum)) : '') . "\n\n"
                 . '<a href="' . tg_h(site_base_url() . '/admin/orders.php?id=' . $orderId) . '">Открыть заявку в админке</a>';
@@ -205,7 +208,7 @@ page_header('Корзина', ['robots' => 'noindex, follow']);
         </fieldset>
         <label class="field">3. Комментарий к заказу<textarea name="comment" rows="3" placeholder="Сроки, удобное время для звонка, пожелания"><?= $v('comment') ?></textarea></label>
         <div style="display:flex; flex-direction:column; gap:10px">
-          <label class="check"><input type="checkbox" name="agree_pd" value="1" required> <span>Даю согласие на <a href="<?= url('page.php?p=privacy') ?>" target="_blank">обработку персональных данных</a> *</span></label>
+          <label class="check"><input type="checkbox" name="agree_pd" value="1" required> <span>Даю <a href="<?= url('page.php?p=consent') ?>" target="_blank">согласие на обработку персональных данных</a> в соответствии с <a href="<?= url('page.php?p=privacy') ?>" target="_blank">политикой</a> *</span></label>
           <label class="check"><input type="checkbox" name="agree_oferta" value="1" required> <span>Принимаю условия <a href="<?= url('page.php?p=oferta') ?>" target="_blank">публичной оферты</a> *</span></label>
         </div>
       </form>

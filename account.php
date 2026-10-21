@@ -101,7 +101,7 @@ page_header('Личный кабинет', ['robots' => 'noindex, nofollow']);
                 <td class="small"><?= implode('<br>', array_map(fn($i) => e($i['name'] . ' ' . $i['size']) . ' — ' . fmt_packs((int)$i['qty'], (int)$i['pack_qty']), $its)) ?></td>
                 <td class="num"><?= fmt_qty($o['total_qty']) ?> шт.</td>
                 <td><span class="pill pill-<?= e($o['status']) ?>"><?= e(status_label_client($o['status'])) ?></span></td>
-                <td style="text-align:right"><form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="repeat"><input type="hidden" name="order_id" value="<?= $o['id'] ?>"><button class="btn btn-outline" type="submit">Повторить заказ</button></form></td>
+                <td style="text-align:right"><div class="row-form"><?php if (!empty($o['invoice_date'])): ?><a class="btn btn-outline" href="<?= url('invoice.php?id=' . $o['id']) ?>" target="_blank">Счёт</a><?php endif; ?><form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="repeat"><input type="hidden" name="order_id" value="<?= $o['id'] ?>"><button class="btn btn-outline" type="submit">Повторить заказ</button></form></div></td>
               </tr>
             <?php endforeach; ?>
             </tbody>

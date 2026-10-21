@@ -8,6 +8,7 @@ $pagesNames = [
     'orders.php' => 'Заказы', 'products.php' => 'Товары', 'categories.php' => 'Разделы каталога', 'documents.php' => 'Документы',
     'pages.php' => 'Страницы', 'clients.php' => 'Клиенты', 'consents.php' => 'Согласия', 'settings.php' => 'Настройки сайта',
     'admins.php' => 'Администраторы', 'login.php' => 'Вход', 'logout.php' => 'Выход',
+    'products_io.php' => 'Товары: Excel', 'invoice.php' => 'Счёт',
 ];
 $actions = [
     'save' => 'сохранение', 'delete' => 'удаление', 'advance' => 'следующий этап заказа', 'cancel' => 'отмена заказа',
@@ -16,7 +17,8 @@ $actions = [
     'add' => 'добавление', 'rights' => 'изменение прав', 'login' => 'вход в админку', 'setup' => 'создание главного администратора',
     'revoke' => 'отметка об отзыве согласия', 'unrevoke' => 'снятие отметки об отзыве', 'tg_test' => 'тест Telegram',
     'tg_find' => 'поиск чата Telegram', 'img_delete' => 'удаление фото', 'img_main' => 'главное фото', 'img_move' => 'порядок фото',
-    'myname' => 'смена своего имени', 'password_reset' => 'сброс пароля клиента', '' => 'сохранение',
+    'myname' => 'смена своего имени', 'apply' => 'загрузка товаров из Excel', 'preview' => 'проверка файла Excel',
+    'purge' => 'удаление всех клиентов', 'password_reset' => 'сброс пароля клиента', '' => 'сохранение',
 ];
 
 $adminId = is_string($_GET['admin'] ?? null) ? (int)$_GET['admin'] : 0;

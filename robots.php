@@ -10,7 +10,7 @@ if (setting('seo_noindex') === '1') {
 }
 $base = rtrim(BASE, '/');
 $lines = ['User-agent: *'];
-foreach (['/admin/', '/api/', '/cart.php', '/account.php', '/login.php', '/logout.php', '/order.php', '/*?q=', '/*&q=', '/*sort='] as $d) {
+foreach (['/admin/', '/api/', '/cart.php', '/account.php', '/login.php', '/logout.php', '/order.php', '/invoice.php', '/*?q=', '/*&q=', '/*sort='] as $d) {
     $lines[] = 'Disallow: ' . $base . $d;
 }
 $lines[] = '';

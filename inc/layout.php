@@ -197,6 +197,7 @@ function page_footer(): void
   <div class="container footer-bottom">
     <span>© <?= e(setting('site_name')) ?>, <?= date('Y') ?><?php if (setting('legal_name')): ?> · <?= e(setting('legal_name')) ?><?php endif; ?><?php if (setting('legal_inn')): ?> · ИНН <?= e(setting('legal_inn')) ?><?php endif; ?><?php if (setting('legal_ogrn')): ?> · ОГРНИП <?= e(setting('legal_ogrn')) ?><?php endif; ?></span>
     <a href="<?= url('page.php?p=privacy') ?>">Политика обработки персональных данных</a>
+    <a href="<?= url('page.php?p=consent') ?>">Согласие на обработку персональных данных</a>
     <a href="<?= url('page.php?p=oferta') ?>">Публичная оферта</a>
   </div>
 </footer>
