@@ -112,6 +112,7 @@ function page_header(string $title = '', array $opt = []): void
 </head>
 <body>
 <a class="skip" href="#main">Перейти к содержимому</a>
+<?php if (maintenance_on()): ?><div class="maint-bar">Технический перерыв: посетители видят заглушку. Вы видите сайт, потому что вошли как администратор. <a href="<?= url('admin/index.php') ?>">Выключить в админке</a></div><?php endif; ?>
 <?php if (IS_DEMO): ?><div class="demo-bar">Демо-версия для просмотра: заказы и изменения в админке не сохраняются надолго.</div><?php endif; ?>
 <header class="site-header">
   <div class="topbar">

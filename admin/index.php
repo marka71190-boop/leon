@@ -40,6 +40,18 @@ admin_header('Обзор', 'index');
   </ul>
 </div>
 <?php endif; ?>
+<?php if ($canSettings): ?>
+<div class="a-card a-maint-card<?= maintenance_on() ? ' is-on' : '' ?>">
+  <div>
+    <h2 style="margin:0 0 4px">Технический перерыв</h2>
+    <p class="a-muted" style="margin:0"><?= maintenance_on() ? 'Сейчас включён: посетители видят заглушку с телефоном, заказы и регистрация недоступны.' : 'Закрыть сайт для посетителей на время работ. Вы, как администратор, будете видеть сайт как обычно.' ?> <a href="<?= url('admin/settings.php#g-Тех. перерыв') ?>">Текст заглушки</a></p>
+  </div>
+  <form method="post" action="<?= url('admin/maintenance.php') ?>"<?= maintenance_on() ? '' : ' data-confirm="Закрыть сайт для посетителей на технический перерыв?"' ?>><?= csrf_field() ?>
+    <input type="hidden" name="action" value="<?= maintenance_on() ? 'off' : 'on' ?>">
+    <button class="a-btn <?= maintenance_on() ? '' : 'a-btn-dark' ?>" type="submit"><?= maintenance_on() ? 'Выключить — открыть сайт' : 'Включить технический перерыв' ?></button>
+  </form>
+</div>
+<?php endif; ?>
 <div class="a-stats">
   <?php foreach ($stats as [$l, $n, $h]): ?>
     <a class="a-stat" href="<?= url($h) ?>"><b><?= $n ?></b><span><?= e($l) ?></span></a>

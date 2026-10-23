@@ -51,6 +51,8 @@ function settings_schema(): array
         'manager_email'    => ['Уведомления', 'Email менеджера для новых заказов', 'text', '', 'Необязательно, дублирует заявки на почту. Можно несколько через запятую'],
         'mail_from'        => ['Уведомления', 'Адрес отправителя писем', 'text', '', 'Например, noreply@ваш-домен.ru (ящик на вашем домене)'],
 
+        'maintenance'      => ['Тех. перерыв', 'Технический перерыв', 'bool', '0', 'Включено: посетители видят заглушку вместо сайта, заказы не принимаются. Администраторы, вошедшие в админку, видят сайт как обычно'],
+        'maintenance_text' => ['Тех. перерыв', 'Текст на заглушке', 'textarea', 'Сайт временно закрыт на технические работы. Скоро всё заработает — а пока заказы и вопросы по телефону.', ''],
         'invoice_vat'      => ['Счёт', 'НДС в счёте', 'text', 'Без НДС', 'Например, «Без НДС» или «В том числе НДС 5%» — печатается под итогом'],
         'invoice_signer'   => ['Счёт', 'Подпись в счёте (Фамилия И. О.)', 'text', '', 'Пусто — берётся из названия ИП, например «Леонов А. Г.»'],
         'invoice_days'     => ['Счёт', 'Срок оплаты счёта, банковских дней', 'int', '5', ''],
@@ -824,5 +826,70 @@ function video_embed_thumb(string $embed): string
 function video_embed_service(string $embed): string
 {
     return str_contains($embed, 'youtube') ? 'YouTube' : (str_contains($embed, 'rutube') ? 'Rutube' : 'VK Видео');
+}
+
+/* ---------- Технический перерыв ---------- */
+
+function maintenance_on(): bool
+{
+    return setting('maintenance') === '1';
+}
+
+/**
+ * При включённом техперерыве посетители видят заглушку (код 503 — поисковики поймут, что это временно).
+ * Админка и вошедшие администраторы работают как обычно.
+ */
+function maintenance_gate(): void
+{
+    if (!maintenance_on() || !empty($_SESSION['admin_id'])) {
+        return;
+    }
+    $script = str_replace('\\', '/', (string)($_SERVER['SCRIPT_FILENAME'] ?? ''));
+    if (basename(dirname($script)) === 'admin') {
+        return;
+    }
+    http_response_code(503);
+    header('Retry-After: 3600');
+    header('Content-Type: text/html; charset=utf-8');
+    header('Cache-Control: no-store');
+    $phone = setting('phone');
+    $tel = preg_replace('~[^\d+]~', '', $phone);
+    ?>
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Технический перерыв — <?= e(setting('site_name')) ?></title>
+<link rel="icon" href="<?= url('assets/favicon.svg') ?>" type="image/svg+xml">
+<style>
+  :root { --accent: <?= e(setting('accent_color') ?: '#F07F1F') ?>; }
+  * { box-sizing: border-box; }
+  body { margin: 0; min-height: 100vh; min-height: 100dvh; display: flex; align-items: center; justify-content: center; padding: 24px 16px;
+         background: #17171A; color: #fff; font: 17px/1.55 'Golos Text', system-ui, -apple-system, 'Segoe UI', sans-serif; }
+  main { max-width: 560px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+  .mark svg { width: 96px; height: auto; }
+  h1 { margin: 0; font-size: clamp(26px, 6vw, 36px); line-height: 1.2; }
+  p { margin: 0; color: #D6D7DA; }
+  .phone { display: inline-flex; align-items: center; min-height: 52px; padding: 0 26px; border-radius: 8px; background: var(--accent); color: #17171A;
+           font-weight: 700; font-size: 20px; text-decoration: none; font-variant-numeric: tabular-nums; }
+  .phone:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+  .muted { font-size: 14px; color: #A9ABB0; }
+</style>
+</head>
+<body>
+<main>
+  <span class="mark" aria-hidden="true"><?= logo_mark(96, true) ?></span>
+  <h1>Технический перерыв</h1>
+  <p><?= nl2br(e(setting('maintenance_text'))) ?></p>
+  <?php if ($phone !== ''): ?><a class="phone" href="tel:<?= e($tel) ?>"><?= e($phone) ?></a><?php endif; ?>
+  <?php if (setting('email') !== ''): ?><p><a href="mailto:<?= e(setting('email')) ?>" style="color:#F59A3A"><?= e(setting('email')) ?></a></p><?php endif; ?>
+  <p class="muted"><?= e(setting('site_name')) ?></p>
+</main>
+</body>
+</html>
+    <?php
+    exit;
 }
 

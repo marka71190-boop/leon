@@ -64,6 +64,12 @@ function admin_header(string $title, string $active = '', bool $editor = false):
 <?php foreach (flash() as $f): ?>
   <div class="a-flash a-flash-<?= e($f['type']) ?>" role="status"><?= e($f['msg']) ?></div>
 <?php endforeach; ?>
+<?php if ($admin && maintenance_on()): ?>
+  <div class="a-maint" role="status">
+    <span><b>Включён технический перерыв.</b> Посетители видят заглушку, заказы не принимаются.</span>
+    <?php if (admin_can($admin, 'settings')): ?><form method="post" action="<?= url('admin/maintenance.php') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="off"><button class="a-btn a-btn-dark a-btn-sm" type="submit">Открыть сайт</button></form><?php endif; ?>
+  </div>
+<?php endif; ?>
 <?php
 }
 

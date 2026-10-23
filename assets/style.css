@@ -327,6 +327,9 @@ h3 { font-size: 18px; margin: 0 0 10px; }
   .od-actions .btn { flex: 1 1 100%; }
 }
 
+.maint-bar { background: var(--accent); color: var(--ink); text-align: center; font-size: 14px; font-weight: 600; padding: 8px 16px; }
+.maint-bar a { color: var(--ink); }
+
 /* Подвал */
 .site-footer { background: var(--ink); color: #D6D7DA; font-size: 15px; margin-top: 32px; }
 .site-footer a { color: #D6D7DA; text-decoration: none; }
