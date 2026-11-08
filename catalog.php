@@ -1,5 +1,5 @@
 <?php
-require __DIR__ . '/inc/bootstrap.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 
 $cats = q('SELECT * FROM categories WHERE active = 1 ORDER BY sort, id')->fetchAll();
 $catId = (int)($_GET['cat'] ?? 0);
@@ -54,49 +54,56 @@ foreach ($cats as $c) {
         $curCat = $c;
     }
 }
+if ($catId && !$curCat) {
+    page_404('Раздел не найден', 'Возможно, раздел переименован или скрыт.');
+}
+// Старые адреса (catalog.php?cat=1) переезжают на /catalog/razdel с кодом 301
+seo_canonical_redirect($curCat ? cat_url($curCat) : 'catalog', ['cat']);
+$baseUrl = url($curCat ? cat_url($curCat) : 'catalog');
 $cart = cart_raw();
 $min = min_order();
 $inCart = cart_total_qty();
 
 // SEO: у раздела свой заголовок и описание; страницы поиска и фильтров не индексируются
 $filtered = $search !== '' || $selSizes || $selTypes || $sort !== '';
-$crumbs = [['Главная', ''], ['Каталог', 'catalog.php']];
+$crumbs = [['Главная', ''], ['Каталог', 'catalog']];
 if ($curCat) {
-    $crumbs[] = [$curCat['name'], 'catalog.php?cat=' . $curCat['id']];
-    $seoTitle = $curCat['seo_title'] ?: $curCat['name'] . ' оптом от производителя — ' . setting('site_name');
+    $crumbs[] = [$curCat['name'], cat_url($curCat)];
+    $seoTitle = $curCat['seo_title'] ?: $curCat['name'] . ' оптом от производителя в Краснодаре — цены | ' . setting('site_name');
     $seoDesc = $curCat['seo_description'] ?: ($curCat['description'] ? rtrim($curCat['description'], '. ') . '. ' : '') . $curCat['name'] . ' оптом от производителя ' . setting('site_name') . ':' . (min_order() > 0 ? ' заказ от ' . fmt_qty(min_order()) . ' шт.,' : '') . ' отгрузка со склада в Краснодаре, доставка по России.';
 } else {
-    $seoTitle = 'Каталог: тарельчатые дюбели, площадки под стяжку, якорные скобы и СВП оптом — ' . setting('site_name');
+    $seoTitle = 'Каталог крепежа оптом: тарельчатые дюбели, площадки под стяжку, якорные скобы, СВП | ' . setting('site_name');
     $seoDesc = 'Каталог крепежа для теплоизоляции и стяжки от производителя ' . setting('site_name') . '. Оптовые цены' . (min_order() > 0 ? ', заказ от ' . fmt_qty(min_order()) . ' шт.' : '') . ', склад в Краснодаре.';
 }
 page_header($curCat['name'] ?? 'Каталог', [
     'title_raw' => $seoTitle,
     'description' => $seoDesc,
-    'canonical' => $curCat ? 'catalog.php?cat=' . $curCat['id'] : 'catalog.php',
+    'canonical' => $curCat ? cat_url($curCat) : 'catalog',
     'robots' => $filtered ? 'noindex, follow' : '',
     'image' => $curCat['image'] ?? '',
-    'jsonld' => [ld_breadcrumbs($crumbs)],
+    'image_alt' => $curCat['name'] ?? 'Каталог',
+    'jsonld' => $filtered ? [ld_breadcrumbs($crumbs)] : [ld_breadcrumbs($crumbs), ld_item_list($rows, $curCat['name'] ?? 'Каталог')],
 ]);
 ?>
 <div class="container page-pad">
-  <nav class="crumbs" aria-label="Навигация"><a href="<?= url() ?>">Главная</a> / <?php if ($curCat): ?><a href="<?= url('catalog.php') ?>">Каталог</a> / <?= e($curCat['name']) ?><?php else: ?>Каталог<?php endif; ?></nav>
+  <nav class="crumbs" aria-label="Навигация"><a href="<?= url() ?>">Главная</a> / <?php if ($curCat): ?><a href="<?= url('catalog') ?>">Каталог</a> / <?= e($curCat['name']) ?><?php else: ?>Каталог<?php endif; ?></nav>
   <div class="section-head">
-    <h1 style="margin:0"><?= e($curCat['name'] ?? 'Каталог') ?></h1>
+    <h1 style="margin:0"><?= e($curCat ? $curCat['name'] . ' оптом' : 'Каталог продукции') ?></h1>
     <span class="muted small">Найдено позиций: <?= count($rows) ?></span>
   </div>
+  <?php if ($curCat && $curCat['description'] !== ''): ?><p class="cat-lead"><?= e($curCat['description']) ?></p><?php endif; ?>
 
   <div class="chips">
-    <a class="chip <?= !$catId ? 'active' : '' ?>" href="<?= url('catalog.php') ?>">Все товары</a>
+    <a class="chip <?= !$catId ? 'active' : '' ?>" href="<?= url('catalog') ?>"<?= !$catId ? ' aria-current="page"' : '' ?>>Все товары</a>
     <?php foreach ($cats as $c): ?>
-      <a class="chip <?= $catId === (int)$c['id'] ? 'active' : '' ?>" href="<?= url('catalog.php?cat=' . $c['id']) ?>"><?= e($c['name']) ?></a>
+      <a class="chip <?= $catId === (int)$c['id'] ? 'active' : '' ?>" href="<?= url(cat_url($c)) ?>"<?= $catId === (int)$c['id'] ? ' aria-current="page"' : '' ?>><?= e($c['name']) ?></a>
     <?php endforeach; ?>
   </div>
 
   <div class="catalog-layout">
     <details class="filters" data-filters open>
       <summary>Фильтры и поиск</summary>
-      <form class="filters-form" method="get" action="<?= url('catalog.php') ?>">
-      <?php if ($catId): ?><input type="hidden" name="cat" value="<?= $catId ?>"><?php endif; ?>
+      <form class="filters-form" method="get" action="<?= e($baseUrl) ?>">
       <label class="field">Поиск по названию
         <input type="search" name="q" value="<?= e($search) ?>" placeholder="Например, 10×120">
       </label>
@@ -123,7 +130,7 @@ page_header($curCat['name'] ?? 'Каталог', [
         </select>
       </label>
       <button class="btn btn-dark" type="submit">Применить</button>
-      <a class="btn btn-outline" href="<?= url('catalog.php' . ($catId ? '?cat=' . $catId : '')) ?>">Сбросить</a>
+      <a class="btn btn-outline" href="<?= e($baseUrl) ?>">Сбросить</a>
       </form>
     </details>
 
@@ -146,8 +153,8 @@ page_header($curCat['name'] ?? 'Каталог', [
                 $want = (int)($cart[$p['id']] ?? $step * 2);
                 $qtyValue = $pack ? max(1, (int)ceil($want / $pack)) : max($step, $want); ?>
             <tr>
-              <td class="c-img"><a href="<?= url('product.php?id=' . $p['id']) ?>"><?= product_thumb($p) ?></a></td>
-              <td><a class="pname" href="<?= url('product.php?id=' . $p['id']) ?>"><?= e($p['name']) ?></a>
+              <td class="c-img"><a href="<?= url(product_url($p)) ?>" tabindex="-1" aria-hidden="true"><?= product_thumb($p) ?></a></td>
+              <td><a class="pname" href="<?= url(product_url($p)) ?>"><?= e($p['name']) ?></a>
                 <div class="sub"><?= e($p['category_name']) ?><?= $p['sku'] ? ' · арт. ' . e($p['sku']) : '' ?><?= $p['material'] ? ' · ' . e($p['material']) : '' ?></div></td>
               <td><?= e($p['size'] ?: '—') ?></td>
               <td class="muted c-hide"><?= $p['pack_qty'] ? fmt_qty($p['pack_qty']) . ' шт./уп.' : '—' ?></td>
@@ -168,6 +175,10 @@ page_header($curCat['name'] ?? 'Каталог', [
           </tbody>
         </table>
       </div>
+      <?php endif; ?>
+      <?php $seoText = $curCat ? (string)($curCat['seo_text'] ?? '') : setting('catalog_seo_text');
+      if (!$filtered && trim(strip_tags($seoText)) !== ''): ?>
+        <div class="content seo-text"><?= render_content($seoText) ?></div>
       <?php endif; ?>
     </div>
   </div>

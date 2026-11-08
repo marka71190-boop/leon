@@ -125,7 +125,8 @@ if (is_post() && post('action') === 'apply') {
             $data['category_id'] = $catId((string)$data['category']);
             unset($data['category']);
         }
-        if ($row['op'] === 'update' && $data) {
+        $data['updated_at'] = date('Y-m-d H:i:s');
+        if ($row['op'] === 'update' && count($data) > 1) {
             $set = implode(', ', array_map(fn($k) => "$k = ?", array_keys($data)));
             q("UPDATE products SET $set WHERE id = ?", [...array_values($data), (int)$row['id']]);
             $updated++;
@@ -136,6 +137,7 @@ if (is_post() && post('action') === 'apply') {
         }
     }
     $pdo->commit();
+    slugs_fill(); // адреса страниц для новых товаров и разделов
     flash('Загрузка выполнена: обновлено товаров — ' . $updated . ', добавлено — ' . $created . ($newCats ? ', новых разделов — ' . $newCats : '') . '.');
     redirect('admin/products.php');
 }

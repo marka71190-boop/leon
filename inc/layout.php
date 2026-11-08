@@ -66,16 +66,22 @@ function page_header(string $title = '', array $opt = []): void
     $desc = seo_cut((string)($opt['description'] ?? '') ?: setting('seo_description'), 200);
     $robots = setting('seo_noindex') === '1' ? 'noindex, nofollow' : (string)($opt['robots'] ?? '');
     if (array_key_exists('canonical', $opt)) {
-        $canonical = abs_url((string)$opt['canonical']);
+        $canonical = $opt['canonical'] === null ? '' : abs_url((string)$opt['canonical']);
     } else {
         $script = ltrim(substr((string)($_SERVER['SCRIPT_NAME'] ?? ''), strlen(BASE)), '/');
         $canonical = abs_url($script === 'index.php' ? '' : $script);
     }
     $img = (string)($opt['image'] ?? '') ?: setting('seo_og_image') ?: 'assets/logo/leonpro-horizontal-for-light-bg.png';
-    $ogImage = str_starts_with($img, 'assets/') ? abs_url($img) : abs_url('uploads/' . ltrim($img, '/'));
+    if (str_starts_with($img, 'assets/')) {
+        $ogImage = abs_url($img);
+    } else {
+        // Для соцсетей и мессенджеров — JPEG до 1200 px (не тяжёлый оригинал с телефона)
+        $og = img_variant($img, 1200, 'jpg');
+        $ogImage = abs_url(ltrim(substr(strtok($og['src'], '?'), strlen(BASE)), '/'));
+    }
     $jsonld = (array)($opt['jsonld'] ?? []);
     $menuPages = q('SELECT slug, title FROM pages WHERE in_menu = 1 ORDER BY sort, id')->fetchAll();
-    $cats = q('SELECT id, name FROM categories WHERE active = 1 ORDER BY sort, id')->fetchAll();
+    $cats = q('SELECT id, name, slug FROM categories WHERE active = 1 ORDER BY sort, id')->fetchAll();
     $cartCount = cart_count();
     $user = current_user();
     ?>
@@ -87,27 +93,31 @@ function page_header(string $title = '', array $opt = []): void
 <title><?= e($siteTitle) ?></title>
 <meta name="description" content="<?= e($desc) ?>">
 <?php if ($robots !== ''): ?><meta name="robots" content="<?= e($robots) ?>"><?php endif; ?>
-<link rel="canonical" href="<?= e($canonical) ?>">
-<meta property="og:type" content="<?= e($opt['type'] ?? 'website') ?>">
+<?php if ($canonical !== ''): ?><link rel="canonical" href="<?= e($canonical) ?>">
+<?php endif; ?><meta property="og:type" content="<?= e($opt['type'] ?? 'website') ?>">
 <meta property="og:site_name" content="<?= e(setting('site_name')) ?>">
 <meta property="og:locale" content="ru_RU">
 <meta property="og:title" content="<?= e($siteTitle) ?>">
 <meta property="og:description" content="<?= e($desc) ?>">
-<meta property="og:url" content="<?= e($canonical) ?>">
-<meta property="og:image" content="<?= e($ogImage) ?>">
+<?php if ($canonical !== ''): ?><meta property="og:url" content="<?= e($canonical) ?>">
+<?php endif; ?><meta property="og:image" content="<?= e($ogImage) ?>">
+<meta property="og:image:alt" content="<?= e($opt['image_alt'] ?? setting('site_name')) ?>">
 <meta name="twitter:card" content="summary_large_image">
 <?php if (setting('yandex_verification') !== ''): ?><meta name="yandex-verification" content="<?= e(setting('yandex_verification')) ?>"><?php endif; ?>
 <?php if (setting('google_verification') !== ''): ?><meta name="google-site-verification" content="<?= e(setting('google_verification')) ?>"><?php endif; ?>
+<link rel="icon" href="<?= url('favicon.ico') ?>" sizes="32x32">
 <link rel="icon" href="<?= url('assets/favicon.svg') ?>" type="image/svg+xml">
-<link rel="apple-touch-icon" href="<?= url('assets/logo/leonpro-mark-for-light-bg.png') ?>">
+<link rel="apple-touch-icon" href="<?= url('assets/apple-touch-icon.png') ?>">
+<meta name="theme-color" content="#17171A">
 <?php foreach ($jsonld as $ld): ?>
 <script type="application/ld+json"><?= json_encode($ld, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG) ?></script>
 <?php endforeach; ?>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700&family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="<?= asset('assets/style.css') ?>">
+<link rel="preload" href="<?= url('assets/fonts/golos-text.woff2') ?>" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="<?= url('assets/fonts/unbounded.woff2') ?>" as="font" type="font/woff2" crossorigin>
+<?php if (!empty($opt['preload_image'])): ?><link rel="preload" as="image" href="<?= e($opt['preload_image']) ?>" fetchpriority="high">
+<?php endif; ?><link rel="stylesheet" href="<?= asset('assets/style.css') ?>">
 <?= accent_css() ?>
+<?= metrika_code() ?>
 <?= setting('head_code') ?>
 </head>
 <body>
@@ -131,8 +141,8 @@ function page_header(string $title = '', array $opt = []): void
         <?= logo_mark() ?><?= wordmark() ?>
       <?php endif; ?>
     </a>
-    <a class="btn btn-accent btn-catalog" href="<?= url('catalog.php') ?>"><?= icon('menu', 18) ?> Каталог</a>
-    <form class="search" action="<?= url('catalog.php') ?>" method="get" role="search">
+    <a class="btn btn-accent btn-catalog" href="<?= url('catalog') ?>"><?= icon('menu', 18) ?> Каталог</a>
+    <form class="search" action="<?= url('catalog') ?>" method="get" role="search">
       <input type="search" name="q" value="<?= e($_GET['q'] ?? '') ?>" aria-label="Поиск по каталогу" placeholder="Поиск: название, размер, артикул">
       <button type="submit" aria-label="Найти"><?= icon('search', 20) ?></button>
     </form>
@@ -143,14 +153,14 @@ function page_header(string $title = '', array $opt = []): void
   </div>
   <nav class="container mainnav" aria-label="Разделы" data-nav>
     <?php foreach ($cats as $c): ?>
-      <a href="<?= url('catalog.php?cat=' . $c['id']) ?>"><?= e($c['name']) ?></a>
+      <a href="<?= url(cat_url($c)) ?>"><?= e($c['name']) ?></a>
     <?php endforeach; ?>
     <span class="nav-sep"></span>
     <?php foreach ($menuPages as $p): ?>
-      <a class="muted-link" href="<?= url('page.php?p=' . urlencode($p['slug'])) ?>"><?= e($p['title']) ?></a>
+      <a class="muted-link" href="<?= url(page_url($p['slug'])) ?>"><?= e($p['title']) ?></a>
     <?php endforeach; ?>
-    <a class="muted-link" href="<?= url('certificates.php') ?>">Сертификаты</a>
-    <a class="muted-link" href="<?= url('contacts.php') ?>">Контакты</a>
+    <a class="muted-link" href="<?= url('certificates') ?>">Сертификаты</a>
+    <a class="muted-link" href="<?= url('contacts') ?>">Контакты</a>
   </nav>
 </header>
 <main id="main">
@@ -162,8 +172,8 @@ function page_header(string $title = '', array $opt = []): void
 
 function page_footer(): void
 {
-    $cats = q('SELECT id, name FROM categories WHERE active = 1 ORDER BY sort, id')->fetchAll();
-    $pages = q('SELECT slug, title FROM pages ORDER BY sort, id')->fetchAll();
+    $cats = q('SELECT id, name, slug FROM categories WHERE active = 1 ORDER BY sort, id')->fetchAll();
+    $pages = q("SELECT slug, title FROM pages WHERE slug NOT IN ('privacy', 'consent', 'oferta') ORDER BY sort, id")->fetchAll();
     ?>
 </main>
 <footer class="site-footer">
@@ -174,17 +184,18 @@ function page_footer(): void
       <p class="footer-slogan"><?= e(setting('slogan')) ?></p>
     </div>
     <nav aria-label="Каталог">
-      <h2>Каталог</h2>
-      <?php foreach ($cats as $c): ?><a href="<?= url('catalog.php?cat=' . $c['id']) ?>"><?= e($c['name']) ?></a><?php endforeach; ?>
+      <p class="footer-h">Каталог</p>
+      <?php foreach ($cats as $c): ?><a href="<?= url(cat_url($c)) ?>"><?= e($c['name']) ?></a><?php endforeach; ?>
     </nav>
     <nav aria-label="Покупателям">
-      <h2>Покупателям</h2>
-      <?php foreach ($pages as $p): ?><a href="<?= url('page.php?p=' . urlencode($p['slug'])) ?>"><?= e($p['title']) ?></a><?php endforeach; ?>
-      <a href="<?= url('certificates.php') ?>">Сертификаты</a>
+      <p class="footer-h">Покупателям</p>
+      <?php foreach ($pages as $p): ?><a href="<?= url(page_url($p['slug'])) ?>"><?= e($p['title']) ?></a><?php endforeach; ?>
+      <a href="<?= url('certificates') ?>">Сертификаты</a>
+      <a href="<?= url('contacts') ?>">Контакты</a>
       <a href="<?= url('account.php') ?>">Личный кабинет</a>
     </nav>
     <address>
-      <h2>Контакты</h2>
+      <p class="footer-h">Контакты</p>
       <span><?= e(setting('address')) ?></span>
       <a class="footer-phone" href="tel:<?= e(preg_replace('~[^\d+]~', '', setting('phone'))) ?>"><?= e(setting('phone')) ?></a>
       <?php if (setting('email')): ?><a href="mailto:<?= e(setting('email')) ?>"><?= e(setting('email')) ?></a><?php endif; ?>
@@ -197,11 +208,17 @@ function page_footer(): void
   </div>
   <div class="container footer-bottom">
     <span>© <?= e(setting('site_name')) ?>, <?= date('Y') ?><?php if (setting('legal_name')): ?> · <?= e(setting('legal_name')) ?><?php endif; ?><?php if (setting('legal_inn')): ?> · ИНН <?= e(setting('legal_inn')) ?><?php endif; ?><?php if (setting('legal_ogrn')): ?> · ОГРНИП <?= e(setting('legal_ogrn')) ?><?php endif; ?></span>
-    <a href="<?= url('page.php?p=privacy') ?>">Политика обработки персональных данных</a>
-    <a href="<?= url('page.php?p=consent') ?>">Согласие на обработку персональных данных</a>
-    <a href="<?= url('page.php?p=oferta') ?>">Публичная оферта</a>
+    <a href="<?= url(page_url('privacy')) ?>">Политика обработки персональных данных</a>
+    <a href="<?= url(page_url('consent')) ?>">Согласие на обработку персональных данных</a>
+    <a href="<?= url(page_url('oferta')) ?>">Публичная оферта</a>
   </div>
 </footer>
+<?php if (metrika_id() !== '' && empty($_COOKIE['lp_cookie_ok']) && empty($_SESSION['admin_id'])): ?>
+<div class="cookie-note" data-cookie-note role="region" aria-label="Уведомление о cookie">
+  <span>Сайт использует файлы cookie и «Яндекс Метрику», чтобы понимать, как им пользуются. Подробнее — в <a href="<?= url(page_url('privacy')) ?>">политике обработки персональных данных</a>.</span>
+  <button class="btn btn-accent" type="button" data-cookie-ok>Понятно</button>
+</div>
+<?php endif; ?>
 <script src="<?= asset('assets/app.js') ?>"></script>
 </body>
 </html>
@@ -232,10 +249,10 @@ function qty_input(string $name, int $value, int $step, string $id = '', int $pa
         . '<button type="button" data-inc aria-label="Увеличить на ' . $step . '">+</button></div></div>';
 }
 
-function product_thumb(array $p, string $class = 'thumb'): string
+function product_thumb(array $p, string $class = 'thumb', int $w = 80): string
 {
     if (!empty($p['image'])) {
-        return '<img class="' . $class . '" src="' . e(upload_url($p['image'])) . '" alt="' . e($p['name']) . '" loading="lazy">';
+        return img_tag($p['image'], $w, trim($p['name'] . ' ' . ($p['size'] ?? '')), ['class' => $class, 'loading' => 'lazy', 'decoding' => 'async']);
     }
     return '<div class="' . $class . ' thumb-empty" aria-hidden="true">' . logo_mark(34) . '</div>';
 }

@@ -5,6 +5,13 @@ FROM php:8.3-apache
 RUN a2enmod rewrite expires headers \
  && sed -ri 's/AllowOverride None/AllowOverride All/g' /etc/apache2/apache2.conf
 
+# Обработка картинок (уменьшенные копии в WebP для быстрой загрузки) и поворот фото с телефона
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends libjpeg62-turbo-dev libpng-dev libwebp-dev \
+ && docker-php-ext-configure gd --with-jpeg --with-webp \
+ && docker-php-ext-install -j"$(nproc)" gd exif \
+ && rm -rf /var/lib/apt/lists/*
+
 # Настройки PHP и Apache
 COPY docker/php.ini /usr/local/etc/php/conf.d/leonpro.ini
 COPY docker/apache.conf /etc/apache2/conf-enabled/leonpro.conf

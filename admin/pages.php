@@ -25,18 +25,29 @@ if (is_post()) {
             flash('Страница с таким адресом уже есть.', 'error');
             back('admin/pages.php');
         }
+        if (in_array($slug, slug_reserved(), true)) {
+            flash('Адрес «' . $slug . '» занят разделом сайта — выберите другой.', 'error');
+            back('admin/pages.php');
+        }
         $vals = [$slug, $title, (string)($_POST['content'] ?? ''), post('in_menu') === '1' ? 1 : 0, (int)post('sort'),
-                 mb_substr(post('seo_title'), 0, 120), mb_substr(post('seo_description'), 0, 300)];
+                 mb_substr(post('seo_title'), 0, 120), mb_substr(post('seo_description'), 0, 300), date('Y-m-d H:i:s')];
         if ($old) {
-            q('UPDATE pages SET slug=?, title=?, content=?, in_menu=?, sort=?, seo_title=?, seo_description=? WHERE id=?', [...$vals, $id]);
+            q('UPDATE pages SET slug=?, title=?, content=?, in_menu=?, sort=?, seo_title=?, seo_description=?, updated_at=? WHERE id=?', [...$vals, $id]);
+            if ($old['slug'] !== $slug) {
+                redirect_add(page_url($old['slug']), page_url($slug));
+            }
         } else {
-            q('INSERT INTO pages (slug, title, content, in_menu, sort, seo_title, seo_description) VALUES (?,?,?,?,?,?,?)', $vals);
+            q('INSERT INTO pages (slug, title, content, in_menu, sort, seo_title, seo_description, updated_at) VALUES (?,?,?,?,?,?,?,?)', $vals);
             $id = (int)db()->lastInsertId();
         }
         flash('Страница сохранена.');
         redirect('admin/pages.php?edit=' . $id);
     }
     if ($action === 'delete') {
+        $gone = q('SELECT slug FROM pages WHERE id = ?', [$id])->fetchColumn();
+        if ($gone !== false && !in_array($gone, $system, true)) {
+            redirect_add(page_url((string)$gone), '');
+        }
         q('DELETE FROM pages WHERE id = ? AND slug NOT IN (' . implode(',', array_fill(0, count($system), '?')) . ')', [$id, ...$system]);
         flash('Страница удалена.');
         redirect('admin/pages.php');
@@ -50,13 +61,13 @@ if (isset($_GET['edit'])) {
     $isSystem = in_array($p['slug'], $system, true);
     admin_header($p['id'] ? 'Страница' : 'Новая страница', 'pages', true);
     ?>
-    <div class="a-head"><h1><?= $p['id'] ? e($p['title']) : 'Новая страница' ?></h1><div class="a-actions"><?php if ($p['id']): ?><a class="a-btn a-btn-out a-btn-sm" href="<?= url('page.php?p=' . urlencode($p['slug'])) ?>" target="_blank">Открыть на сайте ↗</a><?php endif; ?><a href="<?= url('admin/pages.php') ?>">← Все страницы</a></div></div>
+    <div class="a-head"><h1><?= $p['id'] ? e($p['title']) : 'Новая страница' ?></h1><div class="a-actions"><?php if ($p['id']): ?><a class="a-btn a-btn-out a-btn-sm" href="<?= url(page_url($p['slug'])) ?>" target="_blank">Открыть на сайте ↗</a><?php endif; ?><a href="<?= url('admin/pages.php') ?>">← Все страницы</a></div></div>
     <form method="post" class="a-form">
       <?= csrf_field() ?><input type="hidden" name="action" value="save"><input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
       <div class="a-card a-form">
         <div class="a-grid">
           <?= a_input('title', 'Заголовок *', $p['title'], 'text', '', ['required' => true]) ?>
-          <?= a_input('slug', 'Адрес страницы', $p['slug'], 'text', $isSystem ? 'Системная страница — адрес не меняется' : 'Латиницей, например «about». Ссылка: page.php?p=адрес', $isSystem ? ['readonly' => true] : ['required' => true, 'pattern' => '[a-zA-Z0-9-]+']) ?>
+          <?= a_input('slug', 'Адрес страницы', $p['slug'], 'text', $isSystem ? 'Системная страница — адрес не меняется' : 'Латиницей, например «about». Ссылка: ' . abs_url('адрес') . '. Если поменять, старый адрес будет переадресовывать на новый', $isSystem ? ['readonly' => true] : ['required' => true, 'pattern' => '[a-zA-Z0-9-]+']) ?>
           <?= a_input('sort', 'Порядок в меню', $p['sort'], 'number') ?>
         </div>
         <?= a_check('in_menu', 'Показывать в верхнем меню', (bool)$p['in_menu']) ?>
@@ -66,8 +77,9 @@ if (isset($_GET['edit'])) {
         <h2>SEO страницы</h2>
         <div class="a-grid">
           <?= a_input('seo_title', 'Заголовок для поисковиков (title)', $p['seo_title'], 'text', 'Пусто — «Заголовок — ' . e(setting('site_name')) . '»', ['maxlength' => 120]) ?>
-          <?= a_textarea('seo_description', 'Описание для поисковиков (description)', $p['seo_description'], 'До 160 символов. Пусто — начало текста страницы', false, 2) ?>
+          <?= a_textarea('seo_description', 'Описание для поисковиков (description)', $p['seo_description'], 'Лучше 120–160 символов. Пусто — начало текста страницы', false, 2) ?>
         </div>
+        <?= seo_snippet_preview(($p['title'] ?: 'Страница') . ' — ' . setting('site_name'), seo_cut(render_content((string)$p['content'])), '') ?>
       </div>
       <div class="a-save"><button class="a-btn" type="submit">Сохранить страницу</button></div>
     </form>
@@ -87,7 +99,7 @@ admin_header('Страницы', 'pages');
   <thead><tr><th>Заголовок</th><th>Адрес</th><th>В меню</th><th></th></tr></thead>
   <tbody>
   <?php foreach ($pages as $p): ?>
-    <tr><td><a href="<?= url('admin/pages.php?edit=' . $p['id']) ?>"><b><?= e($p['title']) ?></b></a></td><td class="a-muted">page.php?p=<?= e($p['slug']) ?></td><td><?= $p['in_menu'] ? 'да' : '—' ?></td>
+    <tr><td><a href="<?= url('admin/pages.php?edit=' . $p['id']) ?>"><b><?= e($p['title']) ?></b></a></td><td class="a-muted">/<?= e(page_url($p['slug'])) ?></td><td><?= $p['in_menu'] ? 'да' : '—' ?></td>
       <td><div class="a-actions"><a class="a-btn a-btn-out a-btn-sm" href="<?= url('admin/pages.php?edit=' . $p['id']) ?>">Изменить</a></div></td></tr>
   <?php endforeach; ?>
   </tbody>

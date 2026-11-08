@@ -1,5 +1,5 @@
 <?php
-require __DIR__ . '/inc/bootstrap.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 
 $min = min_order();
 $errors = [];
@@ -110,6 +110,7 @@ if (is_post()) {
 
             $_SESSION['cart'] = [];
             $_SESSION['last_order'] = $orderId;
+            $_SESSION['goal_order'] = $orderId;
             $_SESSION['my_orders'] = array_slice(array_merge([$orderId], (array)($_SESSION['my_orders'] ?? [])), 0, 20);
             redirect('order.php?id=' . $orderId);
         }
@@ -141,7 +142,7 @@ page_header('Корзина', ['robots' => 'noindex, follow']);
 <?php if (!$items): ?>
   <div class="empty">
     <p style="margin:0 0 16px">В корзине пока пусто.</p>
-    <a class="btn btn-accent" href="<?= url('catalog.php') ?>">Перейти в каталог</a>
+    <a class="btn btn-accent" href="<?= url('catalog') ?>">Перейти в каталог</a>
   </div>
 
 <?php else: ?>
@@ -169,7 +170,7 @@ page_header('Корзина', ['robots' => 'noindex, follow']);
             <?php foreach ($items as $it): ?>
               <tr>
                 <td class="c-img"><?= product_thumb($it) ?></td>
-                <td><a class="pname" href="<?= url('product.php?id=' . $it['id']) ?>"><?= e($it['name']) ?></a><div class="sub"><?= e($it['size']) ?><?= $it['pack_qty'] ? ' · ' . fmt_qty($it['pack_qty']) . ' шт./уп.' : '' ?></div></td>
+                <td><a class="pname" href="<?= url(product_url($it)) ?>"><?= e($it['name']) ?></a><div class="sub"><?= e($it['size']) ?><?= $it['pack_qty'] ? ' · ' . fmt_qty($it['pack_qty']) . ' шт./уп.' : '' ?></div></td>
                 <td class="num price"><?= price_cell($it) ?></td>
                 <td class="c-act"><div class="row-form" style="justify-content:flex-start">
                   <?= qty_input('qty[' . $it['id'] . ']', product_pack($it) ? (int)ceil($it['qty'] / product_pack($it)) : (int)$it['qty'], product_step($it), '', product_pack($it)) ?>
@@ -208,8 +209,8 @@ page_header('Корзина', ['robots' => 'noindex, follow']);
         </fieldset>
         <label class="field">3. Комментарий к заказу<textarea name="comment" rows="3" placeholder="Сроки, удобное время для звонка, пожелания"><?= $v('comment') ?></textarea></label>
         <div style="display:flex; flex-direction:column; gap:10px">
-          <label class="check"><input type="checkbox" name="agree_pd" value="1" required> <span>Даю <a href="<?= url('page.php?p=consent') ?>" target="_blank">согласие на обработку персональных данных</a> в соответствии с <a href="<?= url('page.php?p=privacy') ?>" target="_blank">политикой</a> *</span></label>
-          <label class="check"><input type="checkbox" name="agree_oferta" value="1" required> <span>Принимаю условия <a href="<?= url('page.php?p=oferta') ?>" target="_blank">публичной оферты</a> *</span></label>
+          <label class="check"><input type="checkbox" name="agree_pd" value="1" required> <span>Даю <a href="<?= url(page_url('consent')) ?>" target="_blank">согласие на обработку персональных данных</a> в соответствии с <a href="<?= url(page_url('privacy')) ?>" target="_blank">политикой</a> *</span></label>
+          <label class="check"><input type="checkbox" name="agree_oferta" value="1" required> <span>Принимаю условия <a href="<?= url(page_url('oferta')) ?>" target="_blank">публичной оферты</a> *</span></label>
         </div>
       </form>
     </div>

@@ -1,5 +1,5 @@
 <?php
-require __DIR__ . '/inc/bootstrap.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 
 if (is_post()) {
     csrf_check();

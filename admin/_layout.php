@@ -17,6 +17,7 @@ function admin_header(string $title, string $active = '', bool $editor = false):
         'clients'    => ['Клиенты', 'admin/clients.php', 'clients'],
         'consents'   => ['Согласия', 'admin/consents.php', 'consents'],
         'settings'   => ['Настройки сайта', 'admin/settings.php', 'settings'],
+        'seo'        => ['SEO', 'admin/seo.php', 'settings'],
         'admins'     => [$isOwner ? 'Администраторы' : 'Мой пароль', 'admin/admins.php', ''],
         'log'        => ['Журнал действий', 'admin/log.php', 'owner'],
     ];
@@ -34,7 +35,6 @@ function admin_header(string $title, string $active = '', bool $editor = false):
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title><?= e($title) ?> — админка <?= e(setting('site_name')) ?></title>
-<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600&family=Golos+Text:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="<?= asset('assets/admin.css') ?>">
 <?php if ($editor): ?>
 <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
@@ -150,3 +150,25 @@ function a_image(string $name, string $label, ?string $current, string $hint = '
     $h .= '<small>' . e($hint ?: 'JPG, PNG, WEBP или SVG') . '</small></div>';
     return $h;
 }
+
+/**
+ * Предпросмотр сниппета: как страница будет выглядеть в результатах Яндекса и Google.
+ * Берёт поля seo_title, seo_description и slug той же формы; если они пустые — показывает, что сайт подставит сам.
+ */
+function seo_snippet_preview(string $autoTitle = '', string $autoDesc = '', string $urlPrefix = ''): string
+{
+    $id = 'snip-' . bin2hex(random_bytes(3));
+    return '<div class="a-snippet" id="' . $id . '" data-auto-title="' . e($autoTitle) . '" data-auto-desc="' . e(seo_cut($autoDesc, 160)) . '" data-base="' . e(abs_url($urlPrefix)) . '">'
+        . '<div class="a-snippet-label">Так страница будет выглядеть в поиске</div>'
+        . '<div class="a-snippet-url" data-u></div><div class="a-snippet-title" data-t></div><div class="a-snippet-desc" data-d></div>'
+        . '<div class="a-snippet-meta" data-m></div></div>'
+        . '<script>(function(){var b=document.getElementById("' . $id . '"),f=b.closest("form");if(!f)return;'
+        . 'var t=f.querySelector("[name=seo_title]"),d=f.querySelector("[name=seo_description]"),s=f.querySelector("[name=slug]");'
+        . 'function cut(x,n){return x.length>n?x.slice(0,n-1).replace(/\s+\S*$/,"")+"…":x}'
+        . 'function upd(){var tv=(t&&t.value.trim())||b.dataset.autoTitle,dv=(d&&d.value.trim())||b.dataset.autoDesc;'
+        . 'b.querySelector("[data-u]").textContent=b.dataset.base+((s&&s.value.trim())||"…");'
+        . 'b.querySelector("[data-t]").textContent=cut(tv,80);b.querySelector("[data-d]").textContent=cut(dv,165);'
+        . 'var tl=tv.length,dl=dv.length;b.querySelector("[data-m]").innerHTML="Заголовок: <b class=\""+(tl<30||tl>80?"bad":"ok")+"\">"+tl+"</b> симв. (лучше 50–80) · Описание: <b class=\""+(dl<70||dl>170?"bad":"ok")+"\">"+dl+"</b> симв. (лучше 120–160)"+((t&&!t.value.trim())||(d&&!d.value.trim())?" · пустые поля сайт заполнит сам":"");}'
+        . '[t,d,s].forEach(function(x){if(x)x.addEventListener("input",upd)});upd();})();</script>';
+}
+

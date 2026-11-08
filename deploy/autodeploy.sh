@@ -14,5 +14,11 @@ REMOTE=$(git rev-parse '@{u}')
 
 echo "$(date '+%F %T') обновление ${LOCAL%"${LOCAL#???????}"} -> ${REMOTE%"${REMOTE#???????}"}"
 git reset -q --hard "$REMOTE"
-${DEPLOY_CMD:-docker compose up -d --build} && docker image prune -f >/dev/null 2>&1
+if ! ${DEPLOY_CMD:-docker compose up -d --build}; then
+  # Сборка не удалась (например, нет связи) — сайт работает на прежней версии, повторим через 2 минуты
+  git reset -q --hard "$LOCAL"
+  echo "$(date '+%F %T') ошибка сборки, сайт остался на прежней версии — повтор при следующем запуске"
+  exit 1
+fi
+docker image prune -f >/dev/null 2>&1
 echo "$(date '+%F %T') готово"

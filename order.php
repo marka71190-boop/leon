@@ -1,5 +1,5 @@
 <?php
-require __DIR__ . '/inc/bootstrap.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 
 // Страница «Ваш заказ оформлен». Открывается сразу после отправки заявки.
 // Показываем заказ только тому, кто его оформил (в этой же сессии) или владельцу аккаунта.
@@ -18,7 +18,7 @@ if (!$order) {
     <div class="container page-pad">
       <h1 style="margin-top:28px">Заказ не найден</h1>
       <p>Если вы оформляли заказ, его статус виден в личном кабинете. Или позвоните нам: <a href="tel:<?= e(preg_replace('~[^\d+]~', '', setting('phone'))) ?>"><?= e(setting('phone')) ?></a>.</p>
-      <div class="hero-actions"><a class="btn btn-accent" href="<?= url('account.php') ?>">Личный кабинет</a><a class="btn btn-outline" href="<?= url('catalog.php') ?>">Каталог</a></div>
+      <div class="hero-actions"><a class="btn btn-accent" href="<?= url('account.php') ?>">Личный кабинет</a><a class="btn btn-outline" href="<?= url('catalog') ?>">Каталог</a></div>
     </div>
     <?php
     page_footer();
@@ -34,7 +34,7 @@ $owner = $user && (int)$order['user_id'] === (int)$user['id'];
 page_header('Заказ № ' . $id . ' оформлен', ['robots' => 'noindex']);
 ?>
 <div class="container page-pad">
-  <section class="od-head" aria-labelledby="od-title">
+  <section class="od-head" aria-labelledby="od-title"<?php if ((int)($_SESSION['goal_order'] ?? 0) === $id): unset($_SESSION['goal_order']); ?> data-goal-order<?php endif; ?>>
     <span class="done-icon"><?= icon('check', 26) ?></span>
     <p class="eyebrow" style="margin:0">Заказ № <?= $id ?> · <?= date('d.m.Y H:i', strtotime($order['created_at'])) ?></p>
     <h1 id="od-title">Ваш заказ оформлен</h1>
@@ -85,7 +85,7 @@ page_header('Заказ № ' . $id . ' оформлен', ['robots' => 'noindex
     <?php if ($owner): ?>
       <a class="btn btn-accent btn-lg" href="<?= url('account.php') ?>">Статус заказа в личном кабинете</a>
     <?php endif; ?>
-    <a class="btn <?= $owner ? 'btn-outline' : 'btn-accent' ?> btn-lg" href="<?= url('catalog.php') ?>">Продолжить покупки</a>
+    <a class="btn <?= $owner ? 'btn-outline' : 'btn-accent' ?> btn-lg" href="<?= url('catalog') ?>">Продолжить покупки</a>
     <?php if (!$user): ?>
       <a class="btn btn-outline btn-lg" href="<?= url('login.php?mode=register') ?>">Зарегистрироваться</a>
     <?php endif; ?>

@@ -204,6 +204,53 @@ SQL);
         }
         $pdo->exec("INSERT INTO settings (key, value) VALUES ('db_version', '11') ON CONFLICT(key) DO UPDATE SET value = '11'");
     }
+    if ($v < 12) {
+        // SEO: человекопонятные адреса, переадресации со старых адресов, тексты разделов, даты изменений
+        $addCol = static function (string $table, string $col, string $def) use ($pdo): void {
+            $cols = array_column($pdo->query("PRAGMA table_info($table)")->fetchAll(), 'name');
+            if (!in_array($col, $cols, true)) {
+                $pdo->exec("ALTER TABLE $table ADD COLUMN $col $def");
+            }
+        };
+        $addCol('categories', 'slug', "TEXT DEFAULT ''");
+        $addCol('products', 'slug', "TEXT DEFAULT ''");
+        $addCol('categories', 'seo_text', "TEXT DEFAULT ''");
+        foreach (['categories', 'products', 'pages'] as $t) {
+            $addCol($t, 'updated_at', 'TEXT');
+        }
+        $now = date('Y-m-d H:i:s');
+        foreach (['categories', 'products', 'pages'] as $t) {
+            $pdo->prepare("UPDATE $t SET updated_at = ? WHERE updated_at IS NULL")->execute([$now]);
+        }
+        $pdo->exec(<<<SQL
+CREATE TABLE IF NOT EXISTS redirects (old_path TEXT PRIMARY KEY, new_path TEXT NOT NULL, created_at TEXT);
+SQL);
+        $slug = static function (string $table, string $source, int $id) use ($pdo): string {
+            $base = translit_slug($source) ?: ($table === 'products' ? 'tovar' : 'razdel');
+            $try = $base;
+            $st = $pdo->prepare("SELECT 1 FROM $table WHERE slug = ? AND id <> ?");
+            for ($i = 2; $st->execute([$try, $id]) && $st->fetchColumn(); $i++) {
+                $try = $base . '-' . $i;
+            }
+            return $try;
+        };
+        foreach ($pdo->query("SELECT id, name FROM categories WHERE COALESCE(slug, '') = '' ORDER BY id")->fetchAll() as $c) {
+            $pdo->prepare('UPDATE categories SET slug = ? WHERE id = ?')->execute([$slug('categories', $c['name'], (int)$c['id']), $c['id']]);
+        }
+        foreach ($pdo->query("SELECT id, name, size FROM products WHERE COALESCE(slug, '') = '' ORDER BY id")->fetchAll() as $p) {
+            $pdo->prepare('UPDATE products SET slug = ? WHERE id = ?')->execute([$slug('products', trim($p['name'] . ' ' . $p['size']), (int)$p['id']), $p['id']]);
+        }
+        $pdo->exec("CREATE UNIQUE INDEX IF NOT EXISTS categories_slug ON categories(slug) WHERE slug <> ''");
+        $pdo->exec("CREATE UNIQUE INDEX IF NOT EXISTS products_slug ON products(slug) WHERE slug <> ''");
+        // Тексты для разделов каталога (если раздел называется как при установке и текста ещё нет)
+        $st = $pdo->prepare("UPDATE categories SET seo_text = ? WHERE name = ? AND COALESCE(seo_text, '') = ''");
+        foreach (category_seed_texts() as $name => $text) {
+            $st->execute([$text, $name]);
+        }
+        // Политика: фраза о веб-аналитике меняется сама, когда подключают Яндекс Метрику
+        $pdo->exec("UPDATE pages SET content = REPLACE(content, 'Сервисы веб-аналитики на Сайте не используются.', '{{аналитика}}') WHERE slug = 'privacy'");
+        $pdo->exec("INSERT INTO settings (key, value) VALUES ('db_version', '12') ON CONFLICT(key) DO UPDATE SET value = '12'");
+    }
 }
 
 function table_exists(PDO $pdo, string $name): bool
@@ -477,4 +524,28 @@ function page_seed_consent(): string
 <h2>7. Прочее</h2>
 <p>Я подтверждаю, что ознакомлен(-а) с Политикой обработки персональных данных, размещённой на сайте {{сайт}}.</p>
 HTML;
+}
+
+/** Тексты для страниц разделов каталога (видны под списком товаров, редактируются в админке) */
+function category_seed_texts(): array
+{
+    $order = '<h3>Как заказать</h3><p>Выберите размеры и количество упаковок в таблице выше и отправьте заявку.{{минимальный заказ}} Менеджер перезвонит, подтвердит наличие, стоимость и транспортную компанию, после чего выставит счёт. Отгрузка — со склада в Краснодаре, доставка по России транспортными компаниями.</p>';
+    return [
+        'Тарельчатые дюбели' => '<h2>Тарельчатые дюбели для утеплителя оптом</h2>'
+            . '<p>Тарельчатый дюбель (дюбель-зонтик) механически крепит теплоизоляцию к основанию — минеральную вату, пенополистирол и экструдированный пенополистирол. Его применяют при утеплении фасадов, в том числе под штукатурку, а также стен, перекрытий и кровель.</p>'
+            . '<p>Длину дюбеля подбирают по толщине утеплителя с запасом на клеевой слой и глубину анкеровки в стене. Дюбели с пластиковым гвоздём не создают мостиков холода, с металлическим гвоздём — держат большую нагрузку и подходят для тяжёлых плит и плотных оснований.</p>'
+            . $order,
+        'Площадки под стяжку' => '<h2>Площадки под стяжку и фиксаторы сетки оптом</h2>'
+            . '<p>Площадки под стяжку удерживают арматуру и кладочную сетку на нужной высоте при заливке пола. Сетка остаётся внутри слоя раствора, а не лежит на основании, — так армирование работает, а стяжка меньше растрескивается.</p>'
+            . '<p>Площадки ставят с шагом, при котором сетка не прогибается под весом раствора и при ходьбе во время работ. Подходят для цементно-песчаных и полусухих стяжек, в том числе по утеплителю и в системах тёплого пола.</p>'
+            . $order,
+        'Якорные скобы' => '<h2>Якорные скобы для тёплого пола оптом</h2>'
+            . '<p>Якорная скоба (гарпун-скоба) крепит трубу водяного тёплого пола к теплоизоляционным плитам — пенополистиролу или экструдированному пенополистиролу, в том числе поверх плёнки или фольги. Зубцы скобы надёжно держатся в утеплителе и не дают трубе сместиться или всплыть при заливке стяжки.</p>'
+            . '<p>Скобы устанавливают вручную или такером через 30–50 см на прямых участках и чаще на поворотах — так контур сохраняет заданный шаг укладки.</p>'
+            . $order,
+        'СВП' => '<h2>Система выравнивания плитки (СВП) оптом</h2>'
+            . '<p>Система выравнивания плитки помогает уложить керамическую плитку и керамогранит без перепадов между соседними элементами. Зажим заводят под края плиток в шов, а клин прижимает плитки к одной плоскости, пока клей набирает прочность.</p>'
+            . '<p>После высыхания клея верхнюю часть зажима отбивают, а клинья используют повторно. СВП особенно полезна для крупноформатной плитки, пола и стен с боковым освещением, где любой перепад заметен.</p>'
+            . $order,
+    ];
 }

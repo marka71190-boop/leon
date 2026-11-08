@@ -19,18 +19,27 @@ if (is_post()) {
                 delete_upload($image);
                 $image = '';
             }
+            $slug = slug_unique('categories', slug_from_input(post('slug'), post('name')), $id);
             $vals = [post('name'), post('description'), $image, (int)post('sort'), post('active') === '1' ? 1 : 0,
-                     mb_substr(post('seo_title'), 0, 120), mb_substr(post('seo_description'), 0, 300)];
+                     mb_substr(post('seo_title'), 0, 120), mb_substr(post('seo_description'), 0, 300),
+                     $slug, trim((string)($_POST['seo_text'] ?? '')), date('Y-m-d H:i:s')];
             if ($old) {
-                q('UPDATE categories SET name=?, description=?, image=?, sort=?, active=?, seo_title=?, seo_description=? WHERE id=?', [...$vals, $id]);
+                q('UPDATE categories SET name=?, description=?, image=?, sort=?, active=?, seo_title=?, seo_description=?, slug=?, seo_text=?, updated_at=? WHERE id=?', [...$vals, $id]);
+                // Адрес изменился — старый будет переадресовывать на новый
+                if (($old['slug'] ?? '') !== '' && $old['slug'] !== $slug) {
+                    redirect_add('catalog/' . $old['slug'], 'catalog/' . $slug);
+                }
             } else {
-                q('INSERT INTO categories (name, description, image, sort, active, seo_title, seo_description) VALUES (?,?,?,?,?,?,?)', $vals);
+                q('INSERT INTO categories (name, description, image, sort, active, seo_title, seo_description, slug, seo_text, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)', $vals);
             }
             flash('Раздел сохранён.');
         }
         if ($action === 'delete' && $id) {
             $c = q('SELECT * FROM categories WHERE id = ?', [$id])->fetch();
             delete_upload($c['image'] ?? '');
+            if (($c['slug'] ?? '') !== '') {
+                redirect_add('catalog/' . $c['slug'], 'catalog');
+            }
             q('DELETE FROM categories WHERE id = ?', [$id]);
             flash('Раздел удалён. Его товары остались без раздела — назначьте им новый.');
         }
@@ -42,10 +51,10 @@ if (is_post()) {
 
 $cats = q('SELECT c.*, (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id) AS cnt FROM categories c ORDER BY sort, id')->fetchAll();
 $edit = isset($_GET['edit']) ? (int)$_GET['edit'] : null;
-$cur = ['id' => 0, 'name' => '', 'description' => '', 'image' => '', 'sort' => count($cats) + 1, 'active' => 1];
+$cur = ['id' => 0, 'name' => '', 'description' => '', 'image' => '', 'sort' => count($cats) + 1, 'active' => 1, 'slug' => '', 'seo_text' => '', 'seo_title' => '', 'seo_description' => ''];
 foreach ($cats as $c) if ((int)$c['id'] === $edit) $cur = $c;
 
-admin_header('Разделы каталога', 'categories');
+admin_header('Разделы каталога', 'categories', true);
 ?>
 <div class="a-head"><h1>Разделы каталога</h1><a class="a-btn" href="<?= url('admin/categories.php?edit=0') ?>">+ Добавить раздел</a></div>
 <div class="a-table-wrap" style="margin-bottom:20px"><table class="a-table">
@@ -54,7 +63,7 @@ admin_header('Разделы каталога', 'categories');
   <?php foreach ($cats as $c): ?>
     <tr class="<?= $c['active'] ? '' : 'a-off' ?>">
       <td><?= $c['image'] ? '<img src="' . e(upload_url($c['image'])) . '" alt="">' : '' ?></td>
-      <td><b><?= e($c['name']) ?></b><?= $c['active'] ? '' : ' <span class="pill">скрыт</span>' ?></td>
+      <td><b><?= e($c['name']) ?></b><?= $c['active'] ? '' : ' <span class="pill">скрыт</span>' ?><div class="a-muted" style="font-size:12px">/<?= e(cat_url($c)) ?></div></td>
       <td class="a-muted"><?= e($c['description']) ?></td>
       <td><a href="<?= url('admin/products.php?cat=' . $c['id']) ?>"><?= (int)$c['cnt'] ?></a></td>
       <td><?= (int)$c['sort'] ?></td>
@@ -79,12 +88,17 @@ admin_header('Разделы каталога', 'categories');
       <?= a_image('image', 'Картинка раздела', $cur['image']) ?>
     </div>
     <?= a_check('active', 'Показывать на сайте', (bool)$cur['active']) ?>
-    <details<?= ($cur['seo_title'] ?? '') !== '' || ($cur['seo_description'] ?? '') !== '' ? ' open' : '' ?>><summary style="cursor:pointer; font-weight:600">SEO раздела</summary>
-      <div class="a-grid" style="margin-top:10px">
-        <?= a_input('seo_title', 'Заголовок для поисковиков (title)', $cur['seo_title'] ?? '', 'text', 'Пусто — «Название оптом от производителя»', ['maxlength' => 120]) ?>
-        <?= a_textarea('seo_description', 'Описание для поисковиков (description)', $cur['seo_description'] ?? '', 'До 160 символов. Пусто — собирается из описания раздела', false, 2) ?>
+    <div class="a-card" style="margin:0; background:var(--soft)">
+      <h3 style="margin-top:0">SEO раздела</h3>
+      <div class="a-grid">
+        <?= a_input('slug', 'Адрес страницы', $cur['slug'] ?? '', 'text', 'Латиницей через дефис. Пусто — из названия. Если поменять, старый адрес будет переадресовывать на новый', ['pattern' => '[a-zA-Z0-9-]*']) ?>
+        <?= a_input('seo_title', 'Заголовок для поисковиков (title)', $cur['seo_title'] ?? '', 'text', 'Лучше 50–80 символов. Пусто — «Название оптом от производителя в Краснодаре — цены»', ['maxlength' => 120]) ?>
+        <?= a_textarea('seo_description', 'Описание для поисковиков (description)', $cur['seo_description'] ?? '', 'Лучше 120–160 символов. Пусто — собирается из описания раздела', false, 2) ?>
       </div>
-    </details>
+      <?= seo_snippet_preview(($cur['name'] ?: 'Раздел') . ' оптом от производителя в Краснодаре — цены | ' . setting('site_name'),
+            ($cur['description'] ? rtrim($cur['description'], '. ') . '. ' : '') . ($cur['name'] ?: 'Раздел') . ' оптом от производителя ' . setting('site_name') . ': отгрузка со склада в Краснодаре, доставка по России.', 'catalog/') ?>
+      <div style="margin-top:14px"><?= a_textarea('seo_text', 'Текст о разделе (внизу страницы раздела, под товарами)', $cur['seo_text'] ?? '', 'Для Яндекса и Google: для чего этот товар, как выбрать, как заказать. 1–3 абзаца с подзаголовками. Можно использовать метку {{минимальный заказ}}', true, 8) ?></div>
+    </div>
     <div><button class="a-btn" type="submit">Сохранить</button> <a href="<?= url('admin/categories.php') ?>">Отмена</a></div>
   </form>
 </div>

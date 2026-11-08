@@ -68,6 +68,7 @@ if (is_post()) {
                     setting_save($key, preg_match('~^#[0-9a-f]{6}$~i', $c) ? $c : '#F07F1F');
                     break;
                 case 'code':
+                case 'html':
                     setting_save($key, trim((string)($_POST[$key] ?? '')));
                     break;
                 case 'secret':
@@ -93,7 +94,7 @@ foreach ($schema as $key => $def) {
     $groups[$def[0]][$key] = $def;
 }
 
-admin_header('Настройки сайта', 'settings');
+admin_header('Настройки сайта', 'settings', true);
 ?>
 <h1>Настройки сайта</h1>
 <div class="a-filters">
@@ -109,6 +110,7 @@ admin_header('Настройки сайта', 'settings');
           $val = setting($key);
           switch ($type) {
               case 'textarea': echo '<div class="a-field-wide">' . a_textarea($key, $label, $val, $hint, false, 3) . '</div>'; break;
+              case 'html': echo '<div class="a-field-wide">' . a_textarea($key, $label, $val, $hint, true, 6) . '</div>'; break;
               case 'code': echo '<label class="a-field a-field-wide"><span>' . e($label) . '</span><textarea class="mono" name="' . e($key) . '" rows="4">' . e($val) . '</textarea><small>' . e($hint) . '</small></label>'; break;
               case 'image': echo a_image($key, $label, $val, $hint); break;
               case 'bool': echo '<div class="a-field"><span>' . e($label) . '</span>' . a_check($key, 'Включено', $val === '1') . '<small>' . e($hint) . '</small></div>'; break;

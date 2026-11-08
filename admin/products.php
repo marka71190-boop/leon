@@ -33,8 +33,11 @@ if (is_post()) {
                 'sort'        => (int)post('sort'),
                 'seo_title'   => mb_substr(post('seo_title'), 0, 120),
                 'seo_description' => mb_substr(post('seo_description'), 0, 300),
+                'updated_at'  => date('Y-m-d H:i:s'),
             ];
             $old = $id ? q('SELECT * FROM products WHERE id = ?', [$id])->fetch() : null;
+            // Адрес страницы товара: из поля или из названия и размера
+            $data['slug'] = slug_unique('products', slug_from_input(post('slug'), product_slug_source($data)), $id);
             $newImages = handle_uploads('images', ['jpg', 'png', 'webp', 'mp4', 'webm', 'mov'], 'products');
             // Ссылка на видео (Rutube, VK Видео, YouTube)
             $videoUrl = trim(post('video_url'));
@@ -45,6 +48,10 @@ if (is_post()) {
             if ($old) {
                 $set = implode(', ', array_map(fn($k) => "$k = ?", array_keys($data)));
                 q("UPDATE products SET $set WHERE id = ?", [...array_values($data), $id]);
+                // Адрес изменился — старый будет переадресовывать на новый (поисковики не потеряют страницу)
+                if (($old['slug'] ?? '') !== '' && $old['slug'] !== $data['slug']) {
+                    redirect_add('product/' . $old['slug'], 'product/' . $data['slug']);
+                }
             } else {
                 $cols = implode(', ', array_keys($data));
                 q("INSERT INTO products ($cols) VALUES (" . implode(',', array_fill(0, count($data), '?')) . ')', array_values($data));
@@ -61,6 +68,12 @@ if (is_post()) {
                     $newImages[] = $embed;
                 }
                 product_sync_cover($id);
+                // Сразу готовим уменьшенные копии фото, чтобы первый посетитель не ждал
+                foreach ($newImages as $file) {
+                    if (media_kind_by_file($file) === 'image' && !str_starts_with($file, 'http')) {
+                        foreach ([80, 160, 280, 560, 800, 1600] as $w) img_variant($file, $w);
+                    }
+                }
             }
             // Документы товара
             $doc = handle_upload('doc_file', ['pdf', 'jpg', 'png'], 'docs');
@@ -78,7 +91,10 @@ if (is_post()) {
             $pos = array_search($imgId, $ids, true);
             if ($pos !== false) {
                 if ($action === 'img_delete') {
-                    if (($imgs[$pos]['kind'] ?? 'image') !== 'embed') delete_upload($imgs[$pos]['file']);
+                    if (($imgs[$pos]['kind'] ?? 'image') !== 'embed') {
+                        img_variants_delete($imgs[$pos]['file']);
+                        delete_upload($imgs[$pos]['file']);
+                    }
                     q('DELETE FROM product_images WHERE id = ?', [$imgId]);
                     array_splice($ids, $pos, 1);
                 } elseif ($action === 'img_main') {
@@ -104,19 +120,26 @@ if (is_post()) {
             $p['name'] .= ' (копия)';
             $p['image'] = '';
             $p['active'] = 0;
+            $p['slug'] = slug_unique('products', translit_slug(product_slug_source($p)), 0);
+            $p['updated_at'] = date('Y-m-d H:i:s');
             q('INSERT INTO products (' . implode(',', array_keys($p)) . ') VALUES (' . implode(',', array_fill(0, count($p), '?')) . ')', array_values($p));
             $new = (int)db()->lastInsertId();
             flash('Копия создана и скрыта с сайта. Отредактируйте и включите её.');
             redirect('admin/products.php?edit=' . $new);
         }
         if ($action === 'toggle' && $id) {
-            q('UPDATE products SET active = 1 - active WHERE id = ?', [$id]);
+            q('UPDATE products SET active = 1 - active, updated_at = ? WHERE id = ?', [date('Y-m-d H:i:s'), $id]);
             back('admin/products.php');
         }
         if ($action === 'delete' && $id) {
             $p = q('SELECT * FROM products WHERE id = ?', [$id])->fetch();
             foreach (q('SELECT file FROM documents WHERE product_id = ?', [$id])->fetchAll(PDO::FETCH_COLUMN) as $f) delete_upload($f);
-            foreach (product_images($id) as $im) if (($im['kind'] ?? 'image') !== 'embed') delete_upload($im['file']);
+            foreach (product_images($id) as $im) if (($im['kind'] ?? 'image') !== 'embed') { img_variants_delete($im['file']); delete_upload($im['file']); }
+            // Удалённый товар: его адрес ведёт в раздел каталога, а не на ошибку 404
+            if ($p && ($p['slug'] ?? '') !== '') {
+                $cat = $p['category_id'] ? q('SELECT id, slug FROM categories WHERE id = ?', [$p['category_id']])->fetch() : null;
+                redirect_add('product/' . $p['slug'], $cat ? cat_url($cat) : 'catalog');
+            }
             q('DELETE FROM product_images WHERE product_id = ?', [$id]);
             if ($p && $p['image'] && !q('SELECT 1 FROM product_images WHERE file = ?', [$p['image']])->fetchColumn()) delete_upload($p['image']);
             q('DELETE FROM products WHERE id = ?', [$id]);
@@ -135,9 +158,9 @@ if (is_post()) {
         if ($action === 'bulk') {
             // Быстрое редактирование цен и сортировки из списка
             foreach ((array)($_POST['price'] ?? []) as $pid => $price) {
-                q('UPDATE products SET price = ?, sort = ? WHERE id = ?', [
-                    max(0, (float)str_replace([',', ' '], ['.', ''], (string)$price)),
-                    (int)($_POST['sort'][$pid] ?? 0), (int)$pid,
+                q('UPDATE products SET price = ?, sort = ?, updated_at = CASE WHEN price <> ? THEN ? ELSE updated_at END WHERE id = ?', [
+                    $pr = max(0, (float)str_replace([',', ' '], ['.', ''], (string)$price)),
+                    (int)($_POST['sort'][$pid] ?? 0), $pr, date('Y-m-d H:i:s'), (int)$pid,
                 ]);
             }
             flash('Цены сохранены.');
@@ -155,12 +178,12 @@ if (isset($_GET['edit'])) {
     if ($id && !$p) redirect('admin/products.php');
     $p = $p ?: ['id' => 0, 'category_id' => (int)($_GET['cat'] ?? 0), 'name' => '', 'sku' => '', 'size' => '', 'material' => '', 'type' => '',
                 'pack_qty' => 0, 'price' => 0, 'step' => 0, 'description' => '', 'specs' => '', 'image' => '', 'popular' => 0, 'active' => 1, 'sort' => 0,
-                'seo_title' => '', 'seo_description' => ''];
+                'seo_title' => '', 'seo_description' => '', 'slug' => ''];
     $images = $id ? product_images($id) : [];
     $docs = $id ? q('SELECT * FROM documents WHERE product_id = ? ORDER BY sort, id', [$id])->fetchAll() : [];
     admin_header($id ? 'Товар' : 'Новый товар', 'products', true);
     ?>
-    <div class="a-head"><h1><?= $id ? e($p['name'] . ' ' . $p['size']) : 'Новый товар' ?></h1><div class="a-actions"><?php if ($id): ?><a class="a-btn a-btn-out a-btn-sm" href="<?= url('product.php?id=' . $id) ?>" target="_blank">Открыть на сайте ↗</a><?php endif; ?><a href="<?= url('admin/products.php') ?>">← Все товары</a></div></div>
+    <div class="a-head"><h1><?= $id ? e($p['name'] . ' ' . $p['size']) : 'Новый товар' ?></h1><div class="a-actions"><?php if ($id): ?><a class="a-btn a-btn-out a-btn-sm" href="<?= url(product_url($p)) ?>" target="_blank">Открыть на сайте ↗</a><?php endif; ?><a href="<?= url('admin/products.php') ?>">← Все товары</a></div></div>
     <form method="post" enctype="multipart/form-data" class="a-form">
       <?= csrf_field() ?><input type="hidden" name="action" value="save"><input type="hidden" name="id" value="<?= (int)$p['id'] ?>">
       <div class="a-card">
@@ -239,9 +262,12 @@ if (isset($_GET['edit'])) {
         <h2>SEO</h2>
         <p class="a-muted" style="margin-top:-6px">Можно не заполнять — сайт составит заголовок и описание сам из названия, размера, цены и фасовки.</p>
         <div class="a-grid">
-          <?= a_input('seo_title', 'Заголовок для поисковиков (title)', $p['seo_title'], 'text', 'До 60–70 символов. Пусто — «' . e(trim($p['name'] . ' ' . $p['size'])) . ' оптом от производителя»', ['maxlength' => 120]) ?>
-          <?= a_textarea('seo_description', 'Описание для поисковиков (description)', $p['seo_description'], 'До 160 символов. Показывается под ссылкой в Яндексе и Google', false, 2) ?>
+          <?= a_input('slug', 'Адрес страницы', $p['slug'] ?? '', 'text', 'Латиницей через дефис. Пусто — из названия и размера. Если поменять, старый адрес будет переадресовывать на новый', ['pattern' => '[a-zA-Z0-9-]*', 'data-slug-prefix' => abs_url('product/')]) ?>
+          <?= a_input('seo_title', 'Заголовок для поисковиков (title)', $p['seo_title'], 'text', 'Лучше 50–80 символов: главное слово — в начале. Пусто — «' . trim($p['name'] . ' ' . $p['size']) . ' оптом, цена…»', ['maxlength' => 120, 'data-count' => '70']) ?>
+          <?= a_textarea('seo_description', 'Описание для поисковиков (description)', $p['seo_description'], 'Лучше 120–160 символов. Показывается под ссылкой в Яндексе и Google', false, 2) ?>
         </div>
+        <?= seo_snippet_preview(trim($p['name'] . ' ' . $p['size']) . ' оптом' . ((float)$p['price'] > 0 && setting('show_prices') === '1' ? ', цена ' . fmt_money((float)$p['price']) . ((int)$p['pack_qty'] > 0 ? '/уп.' : '') : ' от производителя') . ' — ' . setting('site_name'),
+              $p['description'] ? seo_cut($p['description']) : trim($p['name'] . ' ' . $p['size']) . ' оптом от производителя ' . setting('site_name') . '…', 'product/') ?>
       </div>
       <div class="a-card">
         <h2>Показ на сайте</h2>

@@ -1,5 +1,5 @@
 <?php
-require __DIR__ . '/inc/bootstrap.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 
 $cats = q('SELECT c.*, (SELECT COUNT(*) FROM products p WHERE p.category_id = c.id AND p.active = 1) AS cnt
            FROM categories c WHERE c.active = 1 ORDER BY c.sort, c.id')->fetchAll();
@@ -7,12 +7,15 @@ $popular = q('SELECT p.*, c.name AS category_name FROM products p LEFT JOIN cate
               WHERE p.active = 1 AND p.popular = 1 ORDER BY p.sort, p.id LIMIT 8')->fetchAll();
 $min = min_order();
 
+$heroImg = setting('hero_image') ? img_variant(setting('hero_image'), 1200) : null;
 page_header('', [
     'canonical' => '',
+    'preload_image' => $heroImg['src'] ?? '',
     'jsonld' => [
-        ld_organization(),
-        ['@context' => 'https://schema.org', '@type' => 'WebSite', 'name' => setting('site_name'), 'url' => abs_url(''),
-         'potentialAction' => ['@type' => 'SearchAction', 'target' => abs_url('catalog.php') . '?q={search_term_string}', 'query-input' => 'required name=search_term_string']],
+        ld_organization() + ['@id' => abs_url('') . '#organization'],
+        ['@context' => 'https://schema.org', '@type' => 'WebSite', 'name' => setting('site_name'), 'url' => abs_url(''), 'inLanguage' => 'ru-RU',
+         'publisher' => ['@id' => abs_url('') . '#organization'],
+         'potentialAction' => ['@type' => 'SearchAction', 'target' => ['@type' => 'EntryPoint', 'urlTemplate' => abs_url('catalog') . '?q={search_term_string}'], 'query-input' => 'required name=search_term_string']],
     ],
 ]);
 ?>
@@ -22,7 +25,7 @@ page_header('', [
     <h1><?= e(setting('hero_title')) ?></h1>
     <p><?= nl2br(e(setting('hero_text'))) ?></p>
     <div class="hero-actions">
-      <a class="btn btn-accent btn-lg" href="<?= url('catalog.php') ?>">Открыть каталог</a>
+      <a class="btn btn-accent btn-lg" href="<?= url('catalog') ?>">Открыть каталог</a>
       <a class="btn btn-outline btn-lg" href="#order">Как оформить заказ</a>
     </div>
     <div class="facts">
@@ -32,7 +35,7 @@ page_header('', [
     </div>
   </div>
   <?php if (setting('hero_image')): ?>
-    <div class="hero-visual has-img"><img src="<?= e(upload_url(setting('hero_image'))) ?>" alt=""></div>
+    <div class="hero-visual has-img"><?= img_tag(setting('hero_image'), 1200, setting('hero_title'), ['fetchpriority' => 'high', 'nosrcset' => true]) ?></div>
   <?php else: ?>
     <div class="hero-visual"><img class="hero-logo" src="<?= asset('assets/logo/leonpro-animated-once-for-light-bg.svg') ?>" alt="<?= e(setting('site_name')) ?>" width="380" height="302"><span class="slogan"><?= e(setting('slogan')) ?></span></div>
   <?php endif; ?>
@@ -41,12 +44,12 @@ page_header('', [
 <section class="container section" style="padding-top: 16px">
   <div class="section-head">
     <h2>Каталог продукции</h2>
-    <a href="<?= url('catalog.php') ?>"><b>Весь каталог</b></a>
+    <a href="<?= url('catalog') ?>"><b>Весь каталог</b></a>
   </div>
   <div class="cat-grid">
     <?php foreach ($cats as $c): ?>
-      <a class="cat-card" href="<?= url('catalog.php?cat=' . $c['id']) ?>">
-        <div class="cat-img"><?= $c['image'] ? '<img src="' . e(upload_url($c['image'])) . '" alt="" loading="lazy">' : '<span style="opacity:.3">' . logo_mark(70) . '</span>' ?></div>
+      <a class="cat-card" href="<?= url(cat_url($c)) ?>">
+        <div class="cat-img"><?= $c['image'] ? img_tag($c['image'], 480, $c['name'], ['loading' => 'lazy', 'decoding' => 'async']) : '<span style="opacity:.3">' . logo_mark(70) . '</span>' ?></div>
         <div class="cat-body">
           <b><?= e($c['name']) ?></b>
           <span class="muted small"><?= e($c['description']) ?></span>
@@ -71,11 +74,11 @@ page_header('', [
         <?php foreach ($popular as $p): ?>
           <tr>
             <td class="c-img"><?= product_thumb($p) ?></td>
-            <td><a class="pname" href="<?= url('product.php?id=' . $p['id']) ?>"><?= e($p['name']) ?></a><div class="sub"><?= e($p['category_name']) ?></div></td>
+            <td><a class="pname" href="<?= url(product_url($p)) ?>"><?= e($p['name']) ?></a><div class="sub"><?= e($p['category_name']) ?></div></td>
             <td><?= e($p['size'] ?: '—') ?></td>
             <td class="muted"><?= $p['pack_qty'] ? fmt_qty($p['pack_qty']) . ' шт./уп.' : '—' ?></td>
             <td class="num price"><?= price_cell($p) ?></td>
-            <td class="c-act" style="text-align:right"><a class="btn btn-outline" href="<?= url('product.php?id=' . $p['id']) ?>">Подробнее</a></td>
+            <td class="c-act" style="text-align:right"><a class="btn btn-outline" href="<?= url(product_url($p)) ?>" aria-label="Подробнее: <?= e(trim($p['name'] . ' ' . $p['size'])) ?>">Подробнее</a></td>
           </tr>
         <?php endforeach; ?>
         </tbody>
@@ -101,13 +104,18 @@ page_header('', [
     <div class="panel panel-dark">
       <h2>Сертификаты и паспорта качества</h2>
       <p>Документы на продукцию — в разделе «Сертификаты» и в карточке каждого товара. Скачивайте для тендеров и исполнительной документации.</p>
-      <a class="btn btn-accent" href="<?= url('certificates.php') ?>">Все документы</a>
+      <a class="btn btn-accent" href="<?= url('certificates') ?>">Все документы</a>
     </div>
     <div class="panel">
       <h2>Доставка и оплата</h2>
       <p><?= e(setting('delivery_note')) ?> Оплата — по счёту после согласования заказа с менеджером.</p>
-      <a href="<?= url('page.php?p=delivery') ?>"><b>Подробнее об условиях</b></a>
+      <a href="<?= url(page_url('delivery')) ?>"><b>Подробнее об условиях</b></a>
     </div>
   </div>
 </section>
+<?php if (trim(strip_tags(setting('home_seo_text'))) !== ''): ?>
+<section class="container" style="padding-bottom:48px">
+  <div class="content seo-text" style="margin-top:0"><?= render_content(setting('home_seo_text')) ?></div>
+</section>
+<?php endif; ?>
 <?php page_footer();

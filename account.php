@@ -1,5 +1,5 @@
 <?php
-require __DIR__ . '/inc/bootstrap.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 
 $user = require_user();
 $tab = in_array($_GET['tab'] ?? '', ['orders', 'profile'], true) ? $_GET['tab'] : 'orders';
@@ -88,7 +88,7 @@ page_header('Личный кабинет', ['robots' => 'noindex, nofollow']);
       <section>
         <h2>История заказов</h2>
         <?php if (!$orders): ?>
-          <p class="empty">Заказов пока нет. <a href="<?= url('catalog.php') ?>">Перейти в каталог</a></p>
+          <p class="empty">Заказов пока нет. <a href="<?= url('catalog') ?>">Перейти в каталог</a></p>
         <?php else: ?>
         <div class="table-wrap">
           <table class="table" style="min-width:720px">

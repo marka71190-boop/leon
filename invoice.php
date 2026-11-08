@@ -1,5 +1,5 @@
 <?php
-require __DIR__ . '/inc/bootstrap.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 require __DIR__ . '/inc/invoice.php';
 
 // Счёт для клиента: только свой заказ и только после того, как менеджер выставил счёт

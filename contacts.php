@@ -1,7 +1,13 @@
 <?php
-require __DIR__ . '/inc/bootstrap.php';
+require_once __DIR__ . '/inc/bootstrap.php';
 
-page_header('Контакты', ['description' => 'Контакты ' . setting('site_name') . ': телефон ' . setting('phone') . ', ' . setting('address') . '. Оптовые поставки крепежа со склада в Краснодаре.']);
+seo_canonical_redirect('contacts');
+page_header('Контакты', [
+    'title_raw' => 'Контакты ' . setting('site_name') . ' — телефон, адрес склада в Краснодаре',
+    'description' => 'Контакты ' . setting('site_name') . ': телефон ' . setting('phone') . (setting('email') ? ', ' . setting('email') : '') . ', ' . setting('address') . '. Оптовые поставки крепежа со склада в Краснодаре.',
+    'canonical' => 'contacts',
+    'jsonld' => [ld_local_business(), ld_breadcrumbs([['Главная', ''], ['Контакты', 'contacts']])],
+]);
 $tel = preg_replace('~[^\d+]~', '', setting('phone'));
 ?>
 <div class="container page-pad">

@@ -3,8 +3,6 @@
 $path = '/' . trim((string)parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/');
 if ($path === '/') $path = '/index.php';
 if ($path === '/admin') $path = '/admin/index.php';
-if ($path === '/sitemap.xml') $path = '/sitemap.php';
-if ($path === '/robots.txt') $path = '/robots.php';
 
 // Загруженные в демо файлы живут во временной папке
 if (str_starts_with($path, '/uploads/')) {
@@ -24,6 +22,11 @@ if (str_starts_with($path, '/uploads/')) {
 
 $root = realpath(dirname(__DIR__));
 $file = realpath($root . $path);
+// Человекопонятные адреса (/catalog, /product/…, /about) обрабатывает route.php
+if (!$file && !preg_match('~^/(inc|api|data|uploads|assets|admin)/~', $path)) {
+    $file = $root . '/route.php';
+    $path = '/route.php';
+}
 $rel = $file ? substr($file, strlen($root)) : '';
 if (!$file || !str_starts_with($file, $root . '/') || substr($file, -4) !== '.php'
     || preg_match('~^/(inc|api|data|uploads)/~', $rel) || basename($file)[0] === '_') {

@@ -136,4 +136,23 @@
       if (!confirm(el.dataset.confirm)) e.preventDefault();
     });
   });
+
+  // Яндекс Метрика: цели «Добавил в корзину» и «Оформил заказ»
+  function goal(name) { if (window.LP_YM && window.ym) window.ym(window.LP_YM, 'reachGoal', name); }
+  document.querySelectorAll('form').forEach(function (f) {
+    var a = f.querySelector('input[name="action"]');
+    if (a && a.value === 'add' && /cart\.php/.test(f.getAttribute('action') || '')) {
+      f.addEventListener('submit', function () { goal('cart_add'); });
+    }
+  });
+  if (document.querySelector('[data-goal-order]')) goal('order');
+
+  // Уведомление о cookie
+  var note = document.querySelector('[data-cookie-note]');
+  if (note) {
+    note.querySelector('[data-cookie-ok]').addEventListener('click', function () {
+      document.cookie = 'lp_cookie_ok=1; path=/; max-age=31536000; SameSite=Lax';
+      note.remove();
+    });
+  }
 })();

@@ -1,4 +1,7 @@
 /* Leon_pro — стили сайта */
+/* Шрифты лежат на сайте (без Google Fonts): быстрее и без передачи данных посетителей за рубеж */
+@font-face { font-family: 'Golos Text'; src: url('fonts/golos-text.woff2') format('woff2'); font-weight: 400 700; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Unbounded'; src: url('fonts/unbounded.woff2') format('woff2'); font-weight: 500 700; font-style: normal; font-display: swap; }
 :root {
   --accent: #F07F1F;
   --ink: #17171A;
@@ -336,7 +339,7 @@ h3 { font-size: 18px; margin: 0 0 10px; }
 .site-footer a:hover { color: #F59A3A; }
 .footer-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 36px; padding-top: 56px; padding-bottom: 32px; }
 .footer-grid nav, .footer-grid address { display: flex; flex-direction: column; gap: 10px; font-style: normal; }
-.footer-grid h2 { font-family: var(--font); font-size: 16px; color: #fff; margin: 0 0 4px; letter-spacing: 0; }
+.footer-grid .footer-h { font-family: var(--font); font-weight: 600; font-size: 16px; color: #fff; margin: 0 0 4px; letter-spacing: 0; }
 .footer-about .wordmark { color: #fff; font-size: 24px; }
 .footer-about p { margin: 12px 0 0; }
 .footer-slogan { color: #A9ABB0; font-size: 13px; }
@@ -378,3 +381,13 @@ h3 { font-size: 18px; margin: 0 0 10px; }
   .table.cards .row-form { justify-content: space-between; }
   .table-wrap.has-cards { overflow: visible; }
 }
+
+/* Уведомление о cookie (если подключена Яндекс Метрика) */
+.cookie-note { position: fixed; left: 16px; right: 16px; bottom: 16px; z-index: 50; max-width: 720px; margin: 0 auto; display: flex; gap: 14px 18px; align-items: center; flex-wrap: wrap; justify-content: space-between; background: var(--ink); color: #fff; padding: 14px 18px; border-radius: var(--radius); box-shadow: 0 10px 30px rgba(0,0,0,.25); font-size: 14px; }
+.cookie-note a { color: #FFC08A; }
+/* Текст для поисковиков внизу страниц */
+.seo-text { max-width: 860px; margin-top: 40px; color: var(--text-2); }
+.seo-text h2 { font-size: clamp(20px, 2.2vw, 24px); color: var(--ink); }
+.seo-text h3 { color: var(--ink); margin-top: 22px; }
+.cat-lead { margin: -6px 0 18px; color: var(--muted); max-width: 760px; }
+

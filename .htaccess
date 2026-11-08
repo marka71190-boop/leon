@@ -1,17 +1,26 @@
-# Leon_pro — настройки Apache (Timeweb)
+# Leon_pro — настройки Apache
 DirectoryIndex index.php
-Options -Indexes
+Options -Indexes -MultiViews
 AddDefaultCharset UTF-8
+AddType font/woff2 .woff2
+AddType image/webp .webp
 
-# Карта сайта и правила для поисковиков формируются автоматически
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteRule ^sitemap\.xml$ sitemap.php [L]
-  RewriteRule ^robots\.txt$ robots.php [L]
+  # /index.php → / (одна главная страница для поисковиков)
+  RewriteCond %{THE_REQUEST} \s/+index\.php[\s?] [NC]
+  RewriteRule ^index\.php$ / [R=301,L]
+  # Файлы и папки, которые есть на диске, отдаются как есть
+  RewriteRule ^(assets|uploads|admin|inc|data)/ - [L]
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+  # Всё остальное — человекопонятные адреса (/catalog/…, /product/…, /about, /sitemap.xml, /robots.txt)
+  RewriteRule ^ route.php [L,QSA]
 </IfModule>
 
 # Закрываем служебные файлы
-<FilesMatch "(^\.|\.(md|sqlite|log|lock|json|sh)$)">
+<FilesMatch "(^\.|\.(md|sqlite|sqlite-wal|sqlite-shm|log|lock|json|sh|yml|ini)$)">
   <IfModule mod_authz_core.c>
     Require all denied
   </IfModule>
@@ -21,13 +30,26 @@ AddDefaultCharset UTF-8
   </IfModule>
 </FilesMatch>
 
-# Кэш статики
+# Кэш в браузере: стили и скрипты подключаются с номером версии (?v=…), фото — с уникальными именами
 <IfModule mod_expires.c>
   ExpiresActive On
-  ExpiresByType text/css "access plus 30 days"
-  ExpiresByType application/javascript "access plus 30 days"
+  ExpiresByType text/css "access plus 1 year"
+  ExpiresByType application/javascript "access plus 1 year"
+  ExpiresByType text/javascript "access plus 1 year"
+  ExpiresByType font/woff2 "access plus 1 year"
   ExpiresByType image/svg+xml "access plus 30 days"
-  ExpiresByType image/webp "access plus 30 days"
-  ExpiresByType image/jpeg "access plus 30 days"
-  ExpiresByType image/png "access plus 30 days"
+  ExpiresByType image/webp "access plus 1 year"
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/x-icon "access plus 30 days"
+  ExpiresByType image/vnd.microsoft.icon "access plus 30 days"
+  ExpiresByType video/mp4 "access plus 1 year"
+  ExpiresByType video/webm "access plus 1 year"
+  ExpiresByType application/pdf "access plus 7 days"
+</IfModule>
+<IfModule mod_headers.c>
+  <FilesMatch "\.(css|js|woff2|webp|jpe?g|png|mp4|webm)$">
+    Header set Cache-Control "public, max-age=31536000"
+  </FilesMatch>
+  Header always set X-Content-Type-Options "nosniff"
 </IfModule>
